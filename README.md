@@ -264,12 +264,3 @@ Both migration configs currently use the same schema exports and migration direc
 
 To add an endpoint, update the shared oRPC contract, implement its handler, and use the typed web client. To change persistence, update the Drizzle schema, generate/review a migration, and apply it. CI, lint/format tooling, rate limiting, refresh-token/session revocation, and an embedding/indexing worker are not included.
 
-## Git Publishing Checklist
-
-1. Keep `.env`, credentials, local AWS files, logs, `.platform/`, `node_modules/`, and build outputs out of Git. `.env.example` contains placeholders only; replace its development credentials when deploying.
-2. Review the actual staged file list and scan staged contents for credentials before committing. Ignoring a file does not untrack it if it was already committed.
-3. Run the typechecks, default tests, database integration tests, and explicit production build above.
-4. Commit source, migrations/snapshots, documentation, package manifests, and `pnpm-lock.yaml` together.
-5. Configure the intended Git remote and push only after confirming repository visibility and access permissions.
-
-This directory must be initialized as a Git repository or placed in the intended existing checkout before Git status, staging, commit, and push commands can be used. No repository URL, license, branch policy, or credentials are assumed by this project.
