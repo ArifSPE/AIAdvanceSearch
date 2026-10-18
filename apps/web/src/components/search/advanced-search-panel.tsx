@@ -1,6 +1,6 @@
 'use client'
 
-import type { ExecuteQueryResponse, GeneratedQuery, LlmProvider, SavedQuery } from '@ais/shared'
+import { defineQueryFilter, filterInputType, validateFilterValue, type ExecuteQueryResponse, type FilterValues, type GeneratedQuery, type LlmProvider, type QueryFilter, type SavedQuery } from '@ais/shared'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useId, useState } from 'react'
@@ -12,6 +12,7 @@ import { OutputOrderList } from './output-order-list'
 import { QueryResultsTable } from './query-results-table'
 import { QueryLibrary } from './query-library'
 import { QueryNameDialog } from './query-name-dialog'
+import { FilterParameters } from './filter-parameters'
 
 interface PickerOption {
   id: string
@@ -136,6 +137,10 @@ export function AdvancedSearchPanel() {
   const [selectedTableIds, setSelectedTableIds] = useState<string[]>([])
   const [outputColumnIds, setOutputColumnIds] = useState<string[]>([])
   const [question, setQuestion] = useState('')
+  const [filters, setFilters] = useState<QueryFilter[]>([])
+  const [filtersReviewed, setFiltersReviewed] = useState(false)
+  const [isRecommendingFilters, setIsRecommendingFilters] = useState(false)
+  const [filterError, setFilterError] = useState('')
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isRecommending, setIsRecommending] = useState(false)
   const [recommendError, setRecommendError] = useState('')
@@ -175,6 +180,8 @@ export function AdvancedSearchPanel() {
 
   const availableTables = schemaQuery.data?.tables ?? []
   const selectedTables = availableTables.filter((table) => selectedTableIds.includes(table.id))
+  const invalidFilters = filters.some((filter) => validateFilterValue(filter, filter.defaultValue))
+  const filterValues: FilterValues = Object.fromEntries(filters.map((filter) => [filter.id, filter.defaultValue]))
   const columnById = new Map(
     selectedTables.flatMap((table) => table.columns.map((column) => [column.id, { table, column }] as const)),
   )
@@ -205,10 +212,12 @@ export function AdvancedSearchPanel() {
 
   function toggleTable(id: string) {
     resetResults()
+    setFiltersReviewed(false)
     const isSelected = selectedTableIds.includes(id)
     const table = availableTables.find((candidate) => candidate.id === id)
     const tableColumnIds = new Set(table?.columns.map((column) => column.id))
     const primaryKeyIds = table?.columns.filter((column) => column.is_primary_key).map((column) => column.id) ?? []
+    if (isSelected) setFilters((current) => current.filter((filter) => filter.table !== table?.name))
     setSelectedTableIds((current) =>
       isSelected ? current.filter((tableId) => tableId !== id) : [...current, id],
     )
@@ -257,6 +266,9 @@ export function AdvancedSearchPanel() {
       resetResults()
       setSelectedTableIds(tableIds)
       setOutputColumnIds(columnIds)
+      setFilters(recommendation.filters)
+      setFiltersReviewed(true)
+      setFilterError('')
       setRecommendationNote({
         explanation: recommendation.explanation,
         source: `${recommendation.provider} · ${recommendation.model}`,
@@ -284,7 +296,7 @@ export function AdvancedSearchPanel() {
           .map((entry) => entry.column.name),
       }))
       const outputOrder = orderedOutput.map(({ table, column }) => `${table.name}.${column.name}`)
-      const generated = await client.llm.generateQuery({ question: question.trim(), provider, model, outputOrder, tables })
+      const generated = await client.llm.generateQuery({ question: question.trim(), provider, model, outputOrder, tables, filters })
       setGeneratedQuery(generated)
       setHasUnsavedChanges(true)
       setDraftOutputOrder(outputOrder)
@@ -305,7 +317,7 @@ export function AdvancedSearchPanel() {
     setIsExecuting(true)
 
     try {
-      setExecution(await client.llm.executeQuery({ queryToken: generatedQuery.queryToken }))
+      setExecution(await client.llm.executeQuery({ queryToken: generatedQuery.queryToken, filterValues }))
     } catch (error) {
       setExecutionError(error instanceof Error ? error.message : 'Could not execute the query.')
     } finally {
@@ -319,7 +331,7 @@ export function AdvancedSearchPanel() {
     setSaveError('')
     setSaveMessage('')
     try {
-      const input = { name, queryToken: generatedQuery.queryToken, outputOrder: draftOutputOrder }
+      const input = { name, queryToken: generatedQuery.queryToken, outputOrder: draftOutputOrder, filterValues }
       const saved = editingQuery && saveDialog !== 'copy'
         ? await client.savedQueries.update({ ...input, id: editingQuery.id })
         : await client.savedQueries.save(input)
@@ -346,6 +358,9 @@ export function AdvancedSearchPanel() {
       return availableTables.find((table) => table.name === tableName)?.columns.find((column) => column.name === columnName)?.id ?? []
     }))
     setDraftOutputOrder(saved.outputOrder)
+    setFilters(saved.filters)
+    setFiltersReviewed(true)
+    setFilterError('')
     setSaveName(saved.name)
     setRecommendationNote(null)
     setEditingQuery(saved)
@@ -363,12 +378,27 @@ export function AdvancedSearchPanel() {
     setEditingQuery(null)
     setSelectedTableIds([])
     setOutputColumnIds([])
+    setFilters([])
+    setFiltersReviewed(false)
+    setFilterError('')
     setQuestion('')
     setSaveName('')
     setRecommendationNote(null)
     setIsHelpOpen(false)
     setView('builder')
     setHasUnsavedChanges(false)
+  }
+
+  async function recommendFilters() {
+    setIsRecommendingFilters(true)
+    setFilterError('')
+    try {
+      const recommendation = await client.llm.recommendSelection({ question: question.trim(), provider, model, tableNames: selectedTables.map((table) => table.name) })
+      resetResults()
+      setFilters(recommendation.filters)
+      setFiltersReviewed(true)
+    } catch (error) { setFilterError(error instanceof Error ? error.message : 'Could not recommend filters.') }
+    finally { setIsRecommendingFilters(false) }
   }
 
   if (status === 'loading') {
@@ -396,7 +426,7 @@ export function AdvancedSearchPanel() {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button type="button" disabled={isGenerating || isRecommending || isSaving || isExecuting} onClick={() => {
+        <button type="button" disabled={isGenerating || isRecommending || isRecommendingFilters || isSaving || isExecuting} onClick={() => {
           if (!hasUnsavedChanges || window.confirm('Leave the builder? Unsaved changes will be discarded.')) {
             setHasUnsavedChanges(false)
             setView('library')
@@ -411,13 +441,16 @@ export function AdvancedSearchPanel() {
           <select
             id="prompt-library"
             value={promptLibrary.flatMap((group) => group.prompts).some((prompt) => prompt.question === question) ? question : ''}
-            disabled={promptsQuery.isPending || prompts.length === 0 || isRecommending || isGenerating || isExecuting || isSaving}
+            disabled={promptsQuery.isPending || prompts.length === 0 || isRecommending || isRecommendingFilters || isGenerating || isExecuting || isSaving}
             onChange={(event) => {
               if (!event.target.value) return
               setQuestion(event.target.value)
               resetResults()
               setRecommendError('')
               setRecommendationNote(null)
+              setFilters([])
+              setFiltersReviewed(false)
+              setFilterError('')
             }}
             className="w-full min-w-0 rounded-md border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-accent disabled:opacity-50"
           >
@@ -431,11 +464,11 @@ export function AdvancedSearchPanel() {
         </label>
         {promptsQuery.error && <p role="alert" className="text-xs text-red-600">Prompt library unavailable. <button type="button" onClick={() => void promptsQuery.refetch()} className="underline">Retry</button></p>}
         <label htmlFor="query-question" className="sr-only">What should this query find?</label>
-        <textarea id="query-question" value={question} onChange={(event) => { setQuestion(event.target.value); resetResults() }} maxLength={2000} rows={3}
+        <textarea id="query-question" value={question} disabled={isRecommending || isRecommendingFilters || isGenerating || isExecuting || isSaving} onChange={(event) => { setQuestion(event.target.value); setFiltersReviewed(false); resetResults() }} maxLength={2000} rows={3}
           placeholder="Which borrowers have missed loan payments?"
           className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-accent" />
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={recommendSelection} disabled={isRecommending || isGenerating || question.trim().length < 3 || !selectedProvider?.available || availableTables.length === 0}
+          <button type="button" onClick={recommendSelection} disabled={isRecommending || isRecommendingFilters || isGenerating || isExecuting || isSaving || question.trim().length < 3 || !selectedProvider?.available || availableTables.length === 0}
             className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"><Sparkles size={16} />{isRecommending ? 'Finding selection...' : 'Suggest selection'}</button>
           <button type="button" onClick={() => setIsHelpOpen(!isHelpOpen)} className="text-sm text-accent">Choose manually</button>
         </div>
@@ -451,6 +484,7 @@ export function AdvancedSearchPanel() {
               placeholder="Select one or more tables"
               options={tableOptions}
               selectedIds={selectedTableIds}
+              disabled={isRecommending || isRecommendingFilters || isGenerating || isExecuting || isSaving}
               onToggle={toggleTable}
             />
           </div>
@@ -513,6 +547,33 @@ export function AdvancedSearchPanel() {
 
       <section className="space-y-3 border-t border-line pt-5">
         <h3 className="text-sm font-semibold">3. Generate</h3>
+        <div className="space-y-3 border-b border-line pb-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={recommendFilters} disabled={isGenerating || isExecuting || isRecommending || isRecommendingFilters || selectedTables.length === 0 || question.trim().length < 3 || !selectedProvider?.available}
+              className="flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm disabled:opacity-50"><Sparkles size={14} />{isRecommendingFilters ? 'Finding filters...' : 'Recommend filters'}</button>
+            <label className="min-w-0 flex-1 text-sm"><span className="sr-only">Add filter column</span>
+              <select value="" disabled={isGenerating || isExecuting || isRecommendingFilters || selectedTables.length === 0 || filters.length >= 20} className="w-full min-w-0 rounded-md border border-line bg-surface px-3 py-2 text-sm disabled:opacity-50" onChange={(event) => {
+                const columnId = event.target.value
+                const table = selectedTables.find((candidate) => candidate.columns.some((column) => column.id === columnId))
+                const column = table?.columns.find((candidate) => candidate.id === columnId)
+                if (!table || !column) return
+                const filter = defineQueryFilter({ id: `filter_${crypto.randomUUID()}`, table: table.name, column: column.name, operator: 'eq', defaultValue: filterInputType(column.column_data_type) === 'boolean' ? true : '' }, column, table.display_name, false)
+                resetResults(); setFilters((current) => [...current, filter]); setFiltersReviewed(true)
+              }}>
+                <option value="">Add filter...</option>
+                {selectedTables.map((table) => <optgroup key={table.id} label={table.display_name}>{table.columns.filter((column) => filterInputType(column.column_data_type, column.allowed_values)).map((column) => <option key={column.id} value={column.id}>{column.display_name}</option>)}</optgroup>)}
+              </select>
+            </label>
+          </div>
+          {!filtersReviewed && <div className="flex flex-wrap items-center gap-3 text-xs text-ink-muted"><span>Filter review pending</span><button type="button" disabled={isGenerating || isRecommendingFilters} onClick={() => { resetResults(); setFilters([]); setFiltersReviewed(true) }} className="text-accent underline">Use no filters</button></div>}
+          {filterError && <p role="alert" className="text-sm text-red-600">{filterError}</p>}
+          <FilterParameters filters={filters} disabled={isGenerating || isExecuting || isRecommendingFilters}
+            onFiltersChange={(next) => { resetResults(); setFilters(next); setFiltersReviewed(true) }}
+            onValuesChange={(values) => {
+              setFilters((current) => current.map((filter) => Object.hasOwn(values, filter.id) ? { ...filter, defaultValue: values[filter.id]! } : filter))
+              setExecution(null); setSaveMessage(''); setHasUnsavedChanges(true)
+            }} />
+        </div>
         {hasTableWithoutColumns && (
           <p className="text-xs text-amber-700 dark:text-amber-300">
             Choose at least one column from every selected table.
@@ -575,6 +636,10 @@ export function AdvancedSearchPanel() {
             onClick={generateQuery}
             disabled={
               isGenerating ||
+              isRecommending ||
+              isRecommendingFilters ||
+              invalidFilters ||
+              !filtersReviewed ||
               !selectedProvider?.available ||
               question.trim().length < 3 ||
               selectedTables.length === 0 ||
@@ -601,16 +666,16 @@ export function AdvancedSearchPanel() {
           </pre>
           <div className="flex flex-wrap items-center gap-3">
             {saveMessage ? <p role="status" className="flex items-center gap-2 text-sm text-accent"><Check size={16} />{saveName} · Saved</p> : (
-              <button type="button" disabled={isSaving} onClick={() => setSaveDialog('save')} className="flex items-center gap-2 rounded-md border border-line px-4 py-2 text-sm"><Save size={16} />{editingQuery ? 'Save changes' : 'Save query'}</button>
+              <button type="button" disabled={isSaving || invalidFilters} onClick={() => setSaveDialog('save')} className="flex items-center gap-2 rounded-md border border-line px-4 py-2 text-sm"><Save size={16} />{editingQuery ? 'Save changes' : 'Save query'}</button>
             )}
-            {editingQuery && <button type="button" disabled={isSaving} onClick={() => setSaveDialog('copy')} className="flex items-center gap-2 text-sm text-ink-muted"><Copy size={16} />Save a copy</button>}
+            {editingQuery && <button type="button" disabled={isSaving || invalidFilters} onClick={() => setSaveDialog('copy')} className="flex items-center gap-2 text-sm text-ink-muted"><Copy size={16} />Save a copy</button>}
           </div>
           {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
           {executionError && <p role="alert" className="text-sm text-red-600 dark:text-red-300">{executionError}</p>}
           <button
             type="button"
             onClick={executeQuery}
-            disabled={isExecuting}
+            disabled={isExecuting || invalidFilters}
             className="rounded-lg border border-line px-4 py-2.5 text-sm font-medium transition-colors hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className="flex items-center gap-2"><Play size={16} />{isExecuting ? 'Running query…' : 'Run query'}</span>

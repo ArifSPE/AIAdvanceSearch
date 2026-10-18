@@ -7,6 +7,7 @@ import {
 } from '../modules/saved-queries/saved-queries.service'
 import { pub, requireAuth } from '../orpc/base'
 import type { ApiContext } from '../orpc/base'
+import { InvalidFilterValuesError } from '../modules/llm/query-filters'
 
 function service(context: ApiContext) {
   return new SavedQueriesService(context.db, context.metadataDb, context.queryDb)
@@ -19,6 +20,7 @@ export const savedQueriesRouter = {
     } catch (error) {
       if (error instanceof SavedQueryNotFoundError) throw errors.NOT_FOUND()
       if (error instanceof InvalidGeneratedQueryTokenError) throw errors.INVALID_QUERY_TOKEN()
+      if (error instanceof InvalidFilterValuesError) throw errors.INVALID_FILTER_VALUES()
       if (error instanceof SavedQueryNameTakenError) throw errors.NAME_TAKEN()
       throw error
     }
@@ -43,6 +45,7 @@ export const savedQueriesRouter = {
       return await service(context).save(context.authUser.id, input)
     } catch (error) {
       if (error instanceof InvalidGeneratedQueryTokenError) throw errors.INVALID_QUERY_TOKEN()
+      if (error instanceof InvalidFilterValuesError) throw errors.INVALID_FILTER_VALUES()
       if (error instanceof SavedQueryNameTakenError) throw errors.NAME_TAKEN()
       throw error
     }
@@ -50,10 +53,11 @@ export const savedQueriesRouter = {
 
   run: pub.savedQueries.run.use(requireAuth).handler(async ({ input, context, errors }) => {
     try {
-      return await service(context).run(context.authUser.id, input.id)
+      return await service(context).run(context.authUser.id, input.id, input.filterValues)
     } catch (error) {
       if (error instanceof SavedQueryNotFoundError) throw errors.NOT_FOUND()
       if (error instanceof SavedQueryOutdatedError) throw errors.SAVED_QUERY_OUTDATED()
+      if (error instanceof InvalidFilterValuesError) throw errors.INVALID_FILTER_VALUES()
       context.logger.error({ err: error }, 'Saved query execution failed')
       throw errors.QUERY_EXECUTION_FAILED()
     }

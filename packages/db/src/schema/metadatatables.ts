@@ -32,6 +32,7 @@ export const ColumnMetadata = pgTable(
         name: text().notNull(),
         display_name: text().notNull().default(''),
         column_data_type: text().notNull(),
+        allowed_values: text().array().notNull().default([]),
         is_nullable: boolean().notNull(),
         default_value: text().notNull(),
         character_maximum_length: integer().notNull(),

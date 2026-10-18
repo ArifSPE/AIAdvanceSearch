@@ -70,6 +70,7 @@ export const llmContract = {
       ...unauthorizedError,
       INVALID_QUERY_TOKEN: { message: 'The query draft is invalid, expired, or belongs to another user', status: 401 },
       QUERY_EXECUTION_FAILED: { message: 'The read-only query could not be executed', status: 400 },
+      INVALID_FILTER_VALUES: { message: 'One or more filter values are invalid', status: 400 },
     })
     .input(executeQueryInputSchema)
     .output(executeQueryResponseSchema),

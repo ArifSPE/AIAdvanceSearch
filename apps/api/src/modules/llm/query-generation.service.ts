@@ -1,7 +1,7 @@
 import { generateText, Output } from 'ai'
 import type { Database } from '@ais/db'
 import type { GeneratedQuery, QueryGenerationInput } from '@ais/shared'
-import { generatedQuerySchema } from '@ais/shared'
+import { defineQueryFilter, generatedQuerySchema } from '@ais/shared'
 import { llmConfig, type LlmProviderId } from '../../config/env'
 import { TableMetadataService } from '../metadata/tablemetadata.service'
 import { createLanguageModels } from './model'
@@ -9,12 +9,9 @@ import { generateWithFallback } from './model-fallback'
 import { createGeneratedQueryToken } from './query-token'
 import { assertReadOnlySql } from './sql-validation'
 import { AdministrationService } from '../administration/administration.service'
+import { addQueryFilters, bindQueryFilters } from './query-filters'
 
-const generatedSqlSchema = generatedQuerySchema.omit({
-  provider: true,
-  model: true,
-  queryToken: true,
-})
+const generatedSqlSchema = generatedQuerySchema.pick({ sql: true, explanation: true })
 
 export class InvalidQuerySchemaSelectionError extends Error {
   constructor(message: string) {
@@ -86,6 +83,14 @@ export class QueryGenerationService {
       return { selection, table, selectedColumns }
     })
     const selectedTableNames = new Set(selections.map(({ table }) => table.name))
+    if (new Set(input.filters?.map((filter) => filter.id)).size !== (input.filters?.length ?? 0)) throw new InvalidQuerySchemaSelectionError('Filter IDs must be unique')
+    const filters = (input.filters ?? []).map((filter) => {
+      const table = selections.find((entry) => entry.table.name === filter.table)?.table
+      const column = table?.columns.find((entry) => entry.name === filter.column)
+      if (!table || !column) throw new InvalidQuerySchemaSelectionError(`Unknown filter column: ${filter.table}.${filter.column}`)
+      try { return defineQueryFilter(filter, column, table.display_name) }
+      catch (error) { throw new InvalidQuerySchemaSelectionError(error instanceof Error ? error.message : 'Invalid filter') }
+    })
 
     const selectedQualifiedColumns = selections.flatMap(({ selection }) =>
       selection.columns.map((columnName) => `${selection.name}.${columnName}`),
@@ -122,7 +127,7 @@ export class QueryGenerationService {
         ? table.columns.filter((column) => column.is_primary_key)
         : []
       const columnsByName = new Map(
-        [...selectedColumns, ...foreignKeyColumns, ...referencedPrimaryKeys].map((column) => [
+        [...selectedColumns, ...foreignKeyColumns, ...referencedPrimaryKeys, ...table.columns.filter((column) => filters.some((filter) => filter.table === table.name && filter.column === column.name))].map((column) => [
           column.name,
           column,
         ]),
@@ -153,6 +158,10 @@ export class QueryGenerationService {
       'Only select columns marked output=true. Columns marked output=false are available only for joins and filters.',
       'The SELECT list must contain exactly the entries in outputColumns, in that order. For each entry select `column`, and when outputName differs from the column name write `column AS outputName`.',
       'Qualify columns when joins could be ambiguous. All CTEs must select explicit supplied columns.',
+      ...(input.filters !== undefined ? [
+        'Generate a single SELECT using direct tables and JOINs. Do not use CTEs, UNION, subqueries, WHERE, HAVING, LIMIT, or parameter placeholders.',
+        'The server adds all filters from managedFilters. Ignore filtering conditions in the user question that are not in managedFilters; never recreate a removed filter as a literal condition or JOIN condition.',
+      ] : []),
       'Return a concise explanation of the query and its assumptions.',
     ].join('\n')
 
@@ -163,6 +172,7 @@ export class QueryGenerationService {
         prompt: JSON.stringify({
           question: input.question,
           outputColumns,
+          ...(input.filters !== undefined ? { managedFilters: filters.map((filter) => ({ table: filter.table, column: filter.column, operator: filter.operator })) } : {}),
           selectedSchema,
           relationships: selectedSchema.flatMap((table) =>
             table.columns
@@ -184,7 +194,7 @@ export class QueryGenerationService {
       })
 
       const output = generatedSqlSchema.parse(result.output)
-      const sql = stripCodeFence(output.sql)
+      const sql = input.filters !== undefined ? addQueryFilters(stripCodeFence(output.sql), filters) : stripCodeFence(output.sql)
       assertReadOnlySql(
         sql,
         selectedSchema.map((table) => ({
@@ -192,6 +202,7 @@ export class QueryGenerationService {
           columns: table.columns.map((column) => column.name),
         })),
       )
+      bindQueryFilters(sql, filters)
       return { output, sql }
     })
 
@@ -200,6 +211,7 @@ export class QueryGenerationService {
       sql: generation.value.sql,
       provider: providerConfig.provider,
       model: generation.model.modelId,
+      filters,
     }
     const queryToken = await createGeneratedQueryToken(userId, {
       ...result,

@@ -1,12 +1,15 @@
 import { z } from 'zod'
 import { llmProviderSchema } from './llm'
+import { filterValuesSchema, queryFilterSchema } from './query-filter'
 
 export const savedQueryIdSchema = z.object({ id: z.uuid() })
+export const runSavedQueryInputSchema = savedQueryIdSchema.extend({ filterValues: filterValuesSchema })
 
 export const saveQueryInputSchema = z.object({
   name: z.string().trim().min(1).max(120),
   /** Signed draft from generate-query; the server never accepts raw SQL to save. */
   queryToken: z.string().trim().min(1).max(30000),
+  filterValues: filterValuesSchema,
   /** `table.column` display order, used to restore the selection in the editor. */
   outputOrder: z.array(z.string().trim().min(3).max(127)).max(512).default([]),
 })
@@ -15,6 +18,7 @@ export const updateSavedQueryInputSchema = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1).max(120),
   queryToken: z.string().trim().min(1).max(30000).optional(),
+  filterValues: filterValuesSchema,
   outputOrder: z.array(z.string().trim().min(3).max(127)).max(512).optional(),
 })
 
@@ -33,6 +37,7 @@ export const savedQuerySchema = z.object({
   model: z.string(),
   tableNames: z.array(z.string()),
   outputOrder: z.array(z.string()),
+  filters: z.array(queryFilterSchema).max(20).default([]),
   lastRunAt: z.string().nullable(),
   createdAt: z.string(),
 })

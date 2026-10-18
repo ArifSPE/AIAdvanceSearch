@@ -1,4 +1,4 @@
-import { llmProviderSchema } from '@ais/shared'
+import { llmProviderSchema, queryFilterSchema } from '@ais/shared'
 import { jwtVerify, SignJWT } from 'jose'
 import { z } from 'zod'
 import { jwtSecret } from '../../config/env'
@@ -24,6 +24,7 @@ const generatedQueryTokenPayloadSchema = z.object({
     .min(1)
     .max(8),
   columnTypes: z.record(z.string(), z.string()),
+  filters: z.array(queryFilterSchema).max(20).optional(),
 })
 
 export type GeneratedQueryTokenPayload = z.infer<typeof generatedQueryTokenPayloadSchema>

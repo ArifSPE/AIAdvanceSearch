@@ -7,6 +7,7 @@ import {
   savedQueryListSchema,
   savedQuerySchema,
   updateSavedQueryInputSchema,
+  runSavedQueryInputSchema,
 } from '../schemas/saved-query'
 import { unauthorizedError } from './errors'
 
@@ -19,6 +20,7 @@ export const savedQueriesContract = {
       ...unauthorizedError,
       ...notFound,
       INVALID_QUERY_TOKEN: { message: 'The query draft is invalid or expired. Generate SQL again before saving changes.', status: 401 },
+      INVALID_FILTER_VALUES: { message: 'One or more filter values are invalid', status: 400 },
       NAME_TAKEN: { message: 'You already have a saved query with this name', status: 409 },
     })
     .input(updateSavedQueryInputSchema)
@@ -59,6 +61,7 @@ export const savedQueriesContract = {
         message: 'The query draft is invalid or has expired. Generate the SQL again, then save it.',
         status: 401,
       },
+      INVALID_FILTER_VALUES: { message: 'One or more filter values are invalid', status: 400 },
       NAME_TAKEN: { message: 'You already have a saved query with this name', status: 409 },
     })
     .input(saveQueryInputSchema)
@@ -80,8 +83,9 @@ export const savedQueriesContract = {
         status: 409,
       },
       QUERY_EXECUTION_FAILED: { message: 'The read-only query could not be executed', status: 400 },
+      INVALID_FILTER_VALUES: { message: 'One or more filter values are invalid', status: 400 },
     })
-    .input(savedQueryIdSchema)
+    .input(runSavedQueryInputSchema)
     .output(executeQueryResponseSchema),
 
   remove: oc

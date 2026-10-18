@@ -26,6 +26,7 @@ export const savedQueries = pgTable(
     columnTypes: jsonb().$type<Record<string, string>>().notNull(),
     /** `table.column` display order, used to restore the selection in the editor. */
     outputOrder: jsonb().$type<string[]>().notNull().default([]),
+    filters: jsonb().$type<unknown[]>().notNull().default([]),
     lastRunAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })

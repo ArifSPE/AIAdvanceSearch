@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { filterValuesSchema, queryFilterInputSchema, queryFilterSchema } from './query-filter'
 
 export const llmProviderSchema = z.enum(['ollama', 'openai', 'anthropic', 'bedrock'])
 
@@ -24,6 +25,7 @@ export const queryGenerationInputSchema = z.object({
   provider: llmProviderSchema.optional(),
   /** Must be one of the provider's allowed models; defaults to the provider's model. */
   model: z.string().trim().min(1).max(256).optional(),
+  filters: z.array(queryFilterInputSchema).max(20).optional(),
   /** `table.column` names in the order the user wants them displayed. */
   outputOrder: z.array(z.string().trim().min(3).max(127)).max(512).optional(),
   tables: z
@@ -60,12 +62,14 @@ export const generatedQuerySchema = z.object({
   provider: llmProviderSchema,
   model: z.string().min(1),
   queryToken: z.string().min(1),
+  filters: z.array(queryFilterSchema).max(20).default([]),
 })
 
 export const selectionRecommendationInputSchema = z.object({
   question: z.string().trim().min(3).max(2000),
   provider: llmProviderSchema.optional(),
   model: z.string().trim().min(1).max(256).optional(),
+  tableNames: z.array(z.string().min(1).max(63)).min(1).max(8).optional(),
 })
 
 export const selectionRecommendationSchema = z.object({
@@ -75,10 +79,12 @@ export const selectionRecommendationSchema = z.object({
   explanation: z.string(),
   provider: llmProviderSchema,
   model: z.string().min(1),
+  filters: z.array(queryFilterSchema).max(20).default([]),
 })
 
 export const executeQueryInputSchema = z.object({
   queryToken: z.string().trim().min(1).max(30000),
+  filterValues: filterValuesSchema,
 })
 
 export const queryExecutionResultSchema = z.object({

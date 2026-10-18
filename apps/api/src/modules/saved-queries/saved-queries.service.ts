@@ -1,8 +1,9 @@
 import { and, desc, eq, savedQueries, type Database, type SavedQueryRow } from '@ais/db'
-import { llmProviderSchema, type ExecuteQueryResponse, type SaveQueryInput, type SavedQuery, type UpdateSavedQueryInput } from '@ais/shared'
+import { defineQueryFilter, llmProviderSchema, queryFilterSchema, type FilterValues, type ExecuteQueryResponse, type SaveQueryInput, type SavedQuery, type UpdateSavedQueryInput } from '@ais/shared'
 import { QueryExecutionService } from '../llm/query-execution.service'
 import { createGeneratedQueryToken, verifyGeneratedQueryToken } from '../llm/query-token'
 import { TableMetadataService } from '../metadata/tablemetadata.service'
+import { withFilterDefaults } from '../llm/query-filters'
 
 const maxListed = 200
 
@@ -43,6 +44,7 @@ function toSavedQuery(row: SavedQueryRow): SavedQuery {
     model: row.model,
     tableNames: row.tables.map((table) => table.name),
     outputOrder: row.outputOrder,
+    filters: queryFilterSchema.array().parse(row.filters ?? []),
     lastRunAt: row.lastRunAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   }
@@ -82,6 +84,7 @@ export class SavedQueriesService {
           tables: draft.tables,
           columnTypes: draft.columnTypes,
           outputOrder: input.outputOrder,
+          filters: withFilterDefaults(draft.filters ?? [], input.filterValues),
         })
         .returning()
       return toSavedQuery(row!)
@@ -91,7 +94,7 @@ export class SavedQueriesService {
     }
   }
 
-  async run(userId: string, id: string): Promise<ExecuteQueryResponse> {
+  async run(userId: string, id: string, filterValues?: FilterValues): Promise<ExecuteQueryResponse> {
     const [row] = await this.db
       .select()
       .from(savedQueries)
@@ -108,6 +111,13 @@ export class SavedQueriesService {
       if (missing) throw new SavedQueryOutdatedError(`${table.name}.${missing}`)
     }
 
+    const filters = queryFilterSchema.array().parse(row.filters ?? []).map((filter) => {
+      const table = activeTables.find((candidate) => candidate.name === filter.table)
+      const column = table?.columns.find((candidate) => candidate.name === filter.column)
+      if (!table || !column || column.column_data_type !== filter.dataType) throw new SavedQueryOutdatedError(`${filter.table}.${filter.column}`)
+      try { return defineQueryFilter(filter, column, table.display_name) }
+      catch { throw new SavedQueryOutdatedError(`${filter.table}.${filter.column}`) }
+    })
     const payload = {
       sql: row.sql,
       explanation: row.explanation,
@@ -116,9 +126,10 @@ export class SavedQueriesService {
       model: row.model,
       tables: row.tables,
       columnTypes: row.columnTypes,
+      filters,
     }
     const queryToken = await createGeneratedQueryToken(userId, payload)
-    const response = await new QueryExecutionService(this.queryDb).run(payload, queryToken)
+    const response = await new QueryExecutionService(this.queryDb).run(payload, queryToken, filterValues)
 
     await this.db.update(savedQueries).set({ lastRunAt: new Date() }).where(eq(savedQueries.id, row.id))
     return response
@@ -136,6 +147,7 @@ export class SavedQueriesService {
           question: draft.question ?? '', sql: draft.sql, explanation: draft.explanation,
           provider: draft.provider, model: draft.model, tables: draft.tables,
           columnTypes: draft.columnTypes, outputOrder: input.outputOrder ?? [], lastRunAt: null,
+          filters: withFilterDefaults(draft.filters ?? [], input.filterValues),
         } : {}),
       }).where(and(eq(savedQueries.id, input.id), eq(savedQueries.userId, userId))).returning()
       if (!row) throw new SavedQueryNotFoundError()

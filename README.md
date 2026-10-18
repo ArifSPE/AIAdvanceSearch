@@ -8,7 +8,7 @@ The Next.js frontend shares an oRPC contract and Zod schemas with the Fastify AP
 
 ## Features
 
-- **Advanced DB Search:** describe a question, ask the LLM to recommend entities and columns, review the entity diagram, arrange output columns, and generate SQL before running it.
+- **Advanced DB Search:** describe a question, ask the LLM to recommend entities, columns, and typed filters, review the entity diagram, arrange output columns, and generate SQL before running it.
 - **Query Library:** privately save generated SQL, search saved queries, run them repeatedly without an LLM call, rename, duplicate, edit, or delete them.
 - **Curated Prompt Library:** choose an editable question from published, categorized prompts. Nine lending examples are included.
 - **Provider and model selection:** choose from server-allowed Ollama, OpenAI, Anthropic, and Amazon Bedrock models. Ollama uses schema-constrained structured output.
@@ -174,10 +174,19 @@ Ensure the profile can access the inference profile and underlying models in the
 1. Sign in and open **Advanced DB Search**. The default screen is the Query Library.
 2. Choose **New query**. Type a question or select an editable curated prompt.
 3. Choose **Suggest selection**, or select tables manually. Primary keys are initially selected. Review relationships and arrange output columns in the diagram/output list.
-4. Choose **Generate SQL**, inspect the draft, then **Run query** or **Save query**.
-5. In the Library, open a saved query and run it without another LLM request. Its SQL is revalidated against current active metadata on each run.
+4. Review **Filter parameters** above Generate SQL. Recommendations use the prompt and active column metadata. Add/remove conditions, choose operators, and edit values; confirm **Use no filters** if no conditions are needed.
+5. Choose **Generate SQL**, inspect the draft, then **Run query** or **Save query**.
+6. In the Library, open a saved query, adjust its **Run parameters**, and run it without another LLM request. Its SQL is revalidated against current active metadata on each run.
 
 The action menu supports rename, duplicate, edit, and confirmed deletion. Editing offers **Save changes** for the original query or **Save a copy**. Saved queries are private to their owner.
+
+### Reusable Filter Parameters
+
+Filter controls derive from column metadata: numeric inputs respect precision/scale, integers respect their database range, dates/timestamps use date controls, booleans use Yes/No, enum columns use their `allowed_values`, and text/UUID fields are validated. Column descriptions appear beside the controls. Metadata seeding reads enum choices from PostgreSQL; migrations backfill the existing public enum catalog without reseeding rows.
+
+Saving stores both filter definitions and the current default values. Saved-query runs accept value overrides only, not SQL or replacement filter definitions. Overrides do not change stored defaults; **Reset defaults** restores them. To persist different defaults, edit the query and save changes. Changing a value does not require another LLM call, while adding/removing a condition or changing an operator requires SQL regeneration.
+
+Managed filters combine with **AND** and currently support direct SELECT/JOIN queries, not CTEs or UNION queries. The model generates the unfiltered query structure; the server adds filter predicates through the SQL AST and binds values as Drizzle parameters. Unsupported or invalid SQL is rejected rather than executed. Existing saved queries without filters continue to run as before.
 
 ### Assign an Administrator
 
@@ -197,7 +206,7 @@ Administrators can publish/unpublish, categorize, order, edit, and delete prompt
 
 - The browser submits a user-bound signed draft token, not arbitrary SQL. Draft tokens expire after ten minutes; saved SQL is persisted separately and can be run later.
 - `pgsql-ast-parser` validates a single read-only statement, table and column references, unique output names, and allowed function calls. `count(*)` is allowed; wildcard column selection is blocked.
-- Generated SQL runs as raw SQL through Drizzle in a read-only transaction, with a five-second statement timeout and a 200-row response cap.
+- Validated SQL structure runs through Drizzle in a read-only transaction, with a five-second statement timeout and a 200-row response cap. Editable filter values are bound separately as SQL parameters; they are never inserted into raw SQL text.
 - `pnpm db:query-role` provisions the role in `QUERY_DB_URL` with `SELECT` access to the supported lending tables. Re-run it after changing the queryable table allowlist.
 - Production requires `QUERY_DB_URL`. Development currently falls back to the application role, with a warning, if it is absent; do not rely on that fallback for untrusted queries.
 - Provider output is untrusted. JSON-schema-constrained output helps parsing; it does not guarantee correct or safe SQL. Validation can reject a model response.

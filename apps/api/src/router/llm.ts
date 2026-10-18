@@ -9,6 +9,7 @@ import { listLlmProviders } from '../modules/llm/model'
 import { InvalidGeneratedQueryTokenError } from '../modules/llm/query-token'
 import { NoMatchingSchemaError, SelectionRecommendationService } from '../modules/llm/selection-recommendation.service'
 import { pub, requireAuth } from '../orpc/base'
+import { InvalidFilterValuesError } from '../modules/llm/query-filters'
 
 export const llmRouter = {
   providers: pub.llm.providers.use(requireAuth).handler(({ context }) => listLlmProviders(context.db)),
@@ -45,9 +46,10 @@ export const llmRouter = {
 
   executeQuery: pub.llm.executeQuery.use(requireAuth).handler(async ({ input, context, errors }) => {
     try {
-      return await new QueryExecutionService(context.queryDb).execute(input.queryToken, context.authUser.id)
+      return await new QueryExecutionService(context.queryDb).execute(input.queryToken, context.authUser.id, input.filterValues)
     } catch (error) {
       if (error instanceof InvalidGeneratedQueryTokenError) throw errors.INVALID_QUERY_TOKEN()
+      if (error instanceof InvalidFilterValuesError) throw errors.INVALID_FILTER_VALUES()
       context.logger.error({ err: error }, 'Generated query execution failed')
       throw errors.QUERY_EXECUTION_FAILED()
     }

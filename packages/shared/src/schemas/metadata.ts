@@ -5,6 +5,7 @@ export const metadataColumnSchema = z.object({
   name: z.string(),
   display_name: z.string(),
   column_data_type: z.string(),
+  allowed_values: z.array(z.string()).default([]),
   is_nullable: z.boolean(),
   default_value: z.string(),
   character_maximum_length: z.number().int(),

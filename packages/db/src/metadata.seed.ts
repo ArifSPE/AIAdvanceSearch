@@ -47,6 +47,7 @@ interface ColumnCatalogRow {
   table_name: string
   column_name: string
   column_data_type: string
+  allowed_values: string[]
   is_nullable: boolean
   default_value: string
   character_maximum_length: number
@@ -64,6 +65,13 @@ const COLUMN_CATALOG_QUERY = `
     c.table_name,
     c.column_name,
     CASE WHEN c.data_type = 'USER-DEFINED' THEN c.udt_name ELSE c.data_type END AS column_data_type,
+    COALESCE((
+      SELECT array_agg(e.enumlabel::text ORDER BY e.enumsortorder)
+      FROM pg_catalog.pg_enum e
+      JOIN pg_catalog.pg_type t ON t.oid = e.enumtypid
+      JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+      WHERE t.typname = c.udt_name AND n.nspname = c.udt_schema
+    ), ARRAY[]::text[]) AS allowed_values,
     c.is_nullable = 'YES' AS is_nullable,
     COALESCE(c.column_default, '') AS default_value,
     COALESCE(c.character_maximum_length, 0)::integer AS character_maximum_length,
@@ -204,6 +212,7 @@ export async function seedLendingMetadata(
           name: column.column_name,
           display_name: humanize(column.column_name),
           column_data_type: column.column_data_type,
+          allowed_values: column.allowed_values,
           is_nullable: column.is_nullable,
           default_value: column.default_value,
           character_maximum_length: column.character_maximum_length,

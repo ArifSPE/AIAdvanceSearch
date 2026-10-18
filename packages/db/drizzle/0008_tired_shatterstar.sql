@@ -1,0 +1,1 @@
+ALTER TABLE "saved_queries" ADD COLUMN "filters" jsonb DEFAULT '[]'::jsonb NOT NULL;
