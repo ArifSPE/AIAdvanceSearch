@@ -1,0 +1,37 @@
+{
+  "name": "@ais/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Drizzle ORM schema, migrations and Postgres client",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./client": "./src/client.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "migrate:metadata": "drizzle-kit migrate --config=drizzle.metadata.config.ts",
+    "push": "drizzle-kit push",
+    "studio": "drizzle-kit studio",
+    "drop": "drizzle-kit drop",
+    "seed": "tsx src/seed.ts",
+    "query-role": "tsx src/query-role.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.3",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@ais/config": "workspace:*",
+    "@types/node": "^22.20.5",
+    "dotenv": "^18.0.5",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

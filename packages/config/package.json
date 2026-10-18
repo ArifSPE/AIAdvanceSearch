@@ -1,0 +1,16 @@
+{
+  "name": "@ais/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared TypeScript compiler presets for every workspace package",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsconfig.node.json": "./tsconfig.node.json",
+    "./tsconfig.react.json": "./tsconfig.react.json"
+  },
+  "files": [
+    "tsconfig.base.json",
+    "tsconfig.node.json",
+    "tsconfig.react.json"
+  ]
+}

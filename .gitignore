@@ -1,0 +1,44 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# env
+.env
+.env.*
+!.env.example
+.aws/
+credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editors / os
+.DS_Store
+.idea/
+.claude/settings.local.json
+.vscode/*
+!.vscode/extensions.json
+
+# test / coverage
+coverage/
+.vitest/
+
+# local data
+/data/
+/.platform/
+*.dump
+*.backup

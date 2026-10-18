@@ -1,0 +1,35 @@
+{
+  "name": "ai-advance-search",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Advance Search — Fastify + Drizzle API with a Next.js frontend",
+  "packageManager": "pnpm@10.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/**\" dev",
+    "dev:api": "pnpm --filter @ais/api dev",
+    "dev:web": "pnpm --filter @ais/web dev",
+    "platform:start": "bash scripts/platform.sh start",
+    "platform:stop": "bash scripts/platform.sh stop",
+    "platform:status": "bash scripts/platform.sh status",
+    "build": "pnpm --filter \"./apps/**\" build",
+    "start": "pnpm --parallel --filter \"./apps/**\" start",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:generate": "pnpm --filter @ais/db generate",
+    "db:migrate": "pnpm --filter @ais/db migrate",
+    "db:migrate:metadata": "pnpm --filter @ais/db migrate:metadata",
+    "db:push": "pnpm --filter @ais/db push",
+    "db:studio": "pnpm --filter @ais/db studio",
+    "db:seed": "pnpm --filter @ais/db seed",
+    "db:query-role": "pnpm --filter @ais/db query-role",
+    "clean": "pnpm -r exec rm -rf dist .next node_modules && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

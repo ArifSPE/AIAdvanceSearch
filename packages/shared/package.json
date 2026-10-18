@@ -1,0 +1,26 @@
+{
+  "name": "@ais/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Zod request/response contracts and types shared by the API and the web app",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract/index.ts",
+    "./schemas": "./src/schemas/index.ts",
+    "./types": "./src/types/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@orpc/contract": "^1.15.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@ais/config": "workspace:*",
+    "typescript": "^7.0.2"
+  }
+}

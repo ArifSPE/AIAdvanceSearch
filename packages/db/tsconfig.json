@@ -1,0 +1,4 @@
+{
+  "extends": "@ais/config/tsconfig.node.json",
+  "include": ["src/**/*.ts", "drizzle.config.ts"]
+}
