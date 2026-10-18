@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
+  <title id="title">AI Advance Search</title>
+  <desc id="description">Project cover showing a plain-English question becoming a reviewed PostgreSQL query, connected borrower, loan and payment entities, and a reusable saved query.</desc>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#263130" stroke-width="1"/>
+    </pattern>
+    <clipPath id="canvas"><rect width="1600" height="900" rx="0"/></clipPath>
+  </defs>
+  <g clip-path="url(#canvas)" font-family="Avenir Next, Helvetica Neue, sans-serif">
+    <rect width="1600" height="900" fill="#101918"/>
+    <rect x="760" width="840" height="790" fill="url(#grid)"/>
+    <rect x="64" y="66" width="40" height="40" rx="8" fill="#a7efc5"/>
+    <path d="M 76 79 L 82 85 L 76 91 M 87 92 L 94 92" fill="none" stroke="#101918" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="122" y="93" font-size="18" font-weight="600" fill="#d7e5de">AI ADVANCE SEARCH</text>
+    <text x="1508" y="92" text-anchor="end" font-size="16" fill="#9db2a9">NATURAL LANGUAGE / POSTGRESQL</text>
+
+    <text x="72" y="230" font-size="82" font-weight="700" fill="#f3f7f3">AI Advance</text>
+    <text x="72" y="326" font-size="82" font-weight="700" fill="#a7efc5">Search</text>
+    <text x="76" y="385" font-size="25" fill="#b3c5bc">Your question. Your data. Clear answers.</text>
+
+    <rect x="76" y="439" width="620" height="160" rx="8" fill="#182523" stroke="#42574f"/>
+    <text x="100" y="477" font-size="15" font-weight="600" fill="#a7efc5">ASK IN PLAIN ENGLISH</text>
+    <text x="100" y="520" font-size="25" fill="#f3f7f3">Which borrowers have missed</text>
+    <text x="100" y="555" font-size="25" fill="#f3f7f3">loan payments?</text>
+    <path d="M 644 540 L 670 540 M 660 530 L 670 540 L 660 550" fill="none" stroke="#a7efc5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <text x="78" y="646" font-family="Menlo, Consolas, monospace" font-size="17" fill="#a7efc5">SELECT</text>
+    <text x="156" y="646" font-family="Menlo, Consolas, monospace" font-size="17" fill="#d7e5de">borrower, loan, payment_status</text>
+    <text x="78" y="677" font-family="Menlo, Consolas, monospace" font-size="17" fill="#a7efc5">WHERE</text>
+    <text x="145" y="677" font-family="Menlo, Consolas, monospace" font-size="17" fill="#d7e5de">payment_status =</text>
+    <text x="329" y="677" font-family="Menlo, Consolas, monospace" font-size="17" fill="#f7bd70">'missed'</text>
+    <text x="78" y="718" font-size="14" fill="#8fa89b">ILLUSTRATIVE SQL</text>
+
+    <path d="M 1116 238 C 1154 238 1154 379 1192 379" fill="none" stroke="#a7efc5" stroke-width="2"/>
+    <path d="M 1192 422 C 1140 422 1170 627 1116 627" fill="none" stroke="#f7bd70" stroke-width="2"/>
+
+    <rect x="824" y="145" width="292" height="246" rx="8" fill="#192724" stroke="#4a6358"/>
+    <path d="M 832 145 H 1108 Q 1116 145 1116 153 V 205 H 824 V 153 Q 824 145 832 145" fill="#253a32"/>
+    <text x="846" y="182" font-size="22" font-weight="600" fill="#e9f4ed">Borrowers</text>
+    <text x="1094" y="181" text-anchor="end" font-size="12" font-weight="600" fill="#a7efc5">ENTITY 01</text>
+    <line x1="824" y1="205" x2="1116" y2="205" stroke="#4a6358"/>
+    <text x="846" y="245" font-family="Menlo, Consolas, monospace" font-size="16" fill="#b4c9bd">id</text>
+    <text x="1094" y="245" text-anchor="end" font-size="12" font-weight="600" fill="#a7efc5">PK</text>
+    <rect x="825" y="264" width="290" height="48" fill="#294737"/>
+    <rect x="825" y="264" width="4" height="48" fill="#a7efc5"/>
+    <text x="846" y="295" font-family="Menlo, Consolas, monospace" font-size="16" fill="#e9f4ed">legal_name</text>
+    <text x="1094" y="295" text-anchor="end" font-size="14" fill="#a7efc5">01</text>
+    <text x="846" y="346" font-family="Menlo, Consolas, monospace" font-size="16" fill="#b4c9bd">branch_id</text>
+    <text x="1094" y="346" text-anchor="end" font-size="12" font-weight="600" fill="#9db2a9">FK</text>
+
+    <rect x="1192" y="286" width="332" height="291" rx="8" fill="#192724" stroke="#4a6358"/>
+    <path d="M 1200 286 H 1516 Q 1524 286 1524 294 V 346 H 1192 V 294 Q 1192 286 1200 286" fill="#253a32"/>
+    <text x="1214" y="323" font-size="22" font-weight="600" fill="#e9f4ed">Loans</text>
+    <text x="1502" y="322" text-anchor="end" font-size="12" font-weight="600" fill="#a7efc5">ENTITY 02</text>
+    <line x1="1192" y1="346" x2="1524" y2="346" stroke="#4a6358"/>
+    <text x="1214" y="386" font-family="Menlo, Consolas, monospace" font-size="16" fill="#b4c9bd">borrower_id</text>
+    <text x="1502" y="386" text-anchor="end" font-size="12" font-weight="600" fill="#9db2a9">FK</text>
+    <text x="1214" y="429" font-family="Menlo, Consolas, monospace" font-size="16" fill="#b4c9bd">id</text>
+    <text x="1502" y="429" text-anchor="end" font-size="12" font-weight="600" fill="#a7efc5">PK</text>
+    <rect x="1193" y="443" width="330" height="48" fill="#294737"/>
+    <rect x="1193" y="443" width="4" height="48" fill="#a7efc5"/>
+    <text x="1214" y="474" font-family="Menlo, Consolas, monospace" font-size="16" fill="#e9f4ed">loan_number</text>
+    <text x="1502" y="474" text-anchor="end" font-size="14" fill="#a7efc5">02</text>
+    <text x="1214" y="532" font-family="Menlo, Consolas, monospace" font-size="16" fill="#b4c9bd">outstanding_balance</text>
+
+    <rect x="824" y="534" width="292" height="213" rx="8" fill="#192724" stroke="#5b5543"/>
+    <path d="M 832 534 H 1108 Q 1116 534 1116 542 V 594 H 824 V 542 Q 824 534 832 534" fill="#3a3426"/>
+    <text x="846" y="571" font-size="22" font-weight="600" fill="#f4eadb">Payments</text>
+    <text x="1094" y="570" text-anchor="end" font-size="12" font-weight="600" fill="#f7bd70">ENTITY 03</text>
+    <line x1="824" y1="594" x2="1116" y2="594" stroke="#5b5543"/>
+    <text x="846" y="634" font-family="Menlo, Consolas, monospace" font-size="16" fill="#d5cab9">loan_id</text>
+    <text x="1094" y="634" text-anchor="end" font-size="12" font-weight="600" fill="#c1b6a5">FK</text>
+    <rect x="825" y="651" width="290" height="48" fill="#4b3b26"/>
+    <rect x="825" y="651" width="4" height="48" fill="#f7bd70"/>
+    <text x="846" y="682" font-family="Menlo, Consolas, monospace" font-size="16" fill="#f4eadb">status</text>
+    <text x="1094" y="682" text-anchor="end" font-size="14" fill="#f7bd70">03</text>
+    <text x="846" y="728" font-size="13" fill="#f7bd70">missed</text>
+    <circle cx="1116" cy="238" r="5" fill="#a7efc5"/>
+    <circle cx="1192" cy="379" r="5" fill="#a7efc5"/>
+    <circle cx="1192" cy="422" r="5" fill="#f7bd70"/>
+    <circle cx="1116" cy="627" r="5" fill="#f7bd70"/>
+
+    <rect x="1213" y="632" width="288" height="82" rx="8" fill="#101918" stroke="#42574f"/>
+    <circle cx="1246" cy="673" r="14" fill="#294737"/>
+    <path d="M 1240 673 L 1244 677 L 1252 668" fill="none" stroke="#a7efc5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1272" y="667" font-size="17" font-weight="600" fill="#e9f4ed">Query saved</text>
+    <text x="1272" y="690" font-size="13" fill="#9db2a9">Run again. Fresh results.</text>
+
+    <line x1="76" y1="790" x2="1524" y2="790" stroke="#34473e"/>
+    <g font-size="16" font-weight="500" fill="#d7e5de">
+      <text x="78" y="840">01</text><text x="111" y="840">Describe</text>
+      <path d="M 212 834 H 244 M 238 829 L 244 834 L 238 839" fill="none" stroke="#6f8a7d" stroke-width="1.5"/>
+      <text x="267" y="840">02</text><text x="300" y="840">Review</text>
+      <path d="M 390 834 H 422 M 416 829 L 422 834 L 416 839" fill="none" stroke="#6f8a7d" stroke-width="1.5"/>
+      <text x="445" y="840">03</text><text x="478" y="840">Query</text>
+      <path d="M 554 834 H 586 M 580 829 L 586 834 L 580 839" fill="none" stroke="#6f8a7d" stroke-width="1.5"/>
+      <text x="609" y="840">04</text><text x="642" y="840">Save</text>
+    </g>
+    <text x="1524" y="840" text-anchor="end" font-size="15" fill="#9db2a9">Next.js / Fastify / Drizzle / PostgreSQL</text>
+  </g>
+</svg>

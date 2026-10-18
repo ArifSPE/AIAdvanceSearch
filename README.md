@@ -1,5 +1,7 @@
 # AI Advance Search
 
+![AI Advance Search: plain-English questions, connected database entities, and reusable queries](apps/web/public/project-cover.png)
+
 A contract-first TypeScript monorepo for searching documents and turning plain-English questions into reviewable, read-only PostgreSQL queries.
 
 The Next.js frontend shares an oRPC contract and Zod schemas with the Fastify API. Drizzle owns persistence across separate application and metadata databases. Generated SQL executes through a dedicated, restricted database connection.
