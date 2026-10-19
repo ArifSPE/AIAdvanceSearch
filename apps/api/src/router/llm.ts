@@ -10,6 +10,7 @@ import { InvalidGeneratedQueryTokenError } from '../modules/llm/query-token'
 import { NoMatchingSchemaError, SelectionRecommendationService } from '../modules/llm/selection-recommendation.service'
 import { pub, requireAuth } from '../orpc/base'
 import { InvalidFilterValuesError } from '../modules/llm/query-filters'
+import { QueryPlanningDecisionError } from '../modules/llm/planning-decision'
 
 export const llmRouter = {
   providers: pub.llm.providers.use(requireAuth).handler(({ context }) => listLlmProviders(context.db)),
@@ -18,6 +19,10 @@ export const llmRouter = {
     try {
       return await new SelectionRecommendationService(context.metadataDb, context.db).recommend(input)
     } catch (error) {
+      if (error instanceof QueryPlanningDecisionError) {
+        if (error.status === 'clarification') throw errors.CLARIFICATION_REQUIRED({ message: error.message })
+        throw errors.UNSUPPORTED_QUERY({ message: error.message })
+      }
       if (error instanceof NoMatchingSchemaError) throw errors.NO_MATCHING_SCHEMA()
       if (error instanceof LlmProviderNotConfiguredError) throw errors.LLM_PROVIDER_NOT_CONFIGURED()
       if (error instanceof LlmModelNotAllowedError) throw errors.LLM_MODEL_NOT_ALLOWED()
@@ -30,6 +35,10 @@ export const llmRouter = {
     try {
       return await new QueryGenerationService(context.metadataDb, context.db).generate(input, context.authUser.id)
     } catch (error) {
+      if (error instanceof QueryPlanningDecisionError) {
+        if (error.status === 'clarification') throw errors.CLARIFICATION_REQUIRED({ message: error.message })
+        throw errors.UNSUPPORTED_QUERY({ message: error.message })
+      }
       if (error instanceof InvalidQuerySchemaSelectionError) {
         throw errors.INVALID_SCHEMA_SELECTION()
       }
@@ -46,7 +55,7 @@ export const llmRouter = {
 
   executeQuery: pub.llm.executeQuery.use(requireAuth).handler(async ({ input, context, errors }) => {
     try {
-      return await new QueryExecutionService(context.queryDb).execute(input.queryToken, context.authUser.id, input.filterValues)
+      return await new QueryExecutionService(context.queryDb, context.metadataDb).execute(input.queryToken, context.authUser.id, input.filterValues)
     } catch (error) {
       if (error instanceof InvalidGeneratedQueryTokenError) throw errors.INVALID_QUERY_TOKEN()
       if (error instanceof InvalidFilterValuesError) throw errors.INVALID_FILTER_VALUES()

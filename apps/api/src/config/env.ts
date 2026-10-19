@@ -23,7 +23,7 @@ const envSchema = z.object({
     .default('info'),
   APP_DB_URL: z.string().min(1, 'APP_DB_URL is required'),
   METADATA_DB_URL: z.string().min(1, 'METADATA_DB_URL is required'),
-  QUERY_DB_URL: emptyToUndefined,
+  QUERY_DB_URL: z.string().min(1, 'QUERY_DB_URL is required for row-secured query execution'),
   JWT_SECRET: z.string().min(32).optional(),
   LLM_PROVIDER: z.enum(['ollama', 'openai', 'anthropic', 'bedrock']).default('ollama'),
   LLM_MODEL: z.string().trim().min(1).optional(),

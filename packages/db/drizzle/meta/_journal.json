@@ -71,6 +71,13 @@
       "when": 1792365427426,
       "tag": "0009_fixed_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792376989537,
+      "tag": "0010_optimal_greymalkin",
+      "breakpoints": true
     }
   ]
 }

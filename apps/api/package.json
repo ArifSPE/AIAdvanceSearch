@@ -9,7 +9,8 @@
     "build": "tsup",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:llm": "tsx evals/run-query-planner.ts"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^5.0.117",

@@ -20,9 +20,9 @@ flowchart TD
     subgraph ServerLayer["API - Fastify and oRPC"]
         AuthBoundary["JWT authentication and live admin role checks"]
         BusinessServices["Auth, documents, catalog, saved queries, admin"]
-        LlmWorkflows["Selection recommendation and SQL generation"]
-        ValidationBoundary["Signed drafts and AST validation"]
-        QueryExecution["Read-only transaction and execution limits"]
+        LlmWorkflows["Selection recommendation and query planning"]
+        ValidationBoundary["Strict plan compiler and signed drafts"]
+        QueryExecution["Branch RLS and read-only execution"]
     end
     subgraph StorageLayer["PostgreSQL 17"]
         ApplicationDatabase[("Application data and configuration")]
@@ -79,14 +79,15 @@ flowchart TD
 
 The application database stores users/roles, documents/chunks, search history, the synthetic lending portfolio, saved SQL, provider overrides, and curated prompts. A separate database stores entity and column metadata used for selection, relationships, and query validation.
 
-The API opens three logical pools: an application connection, a metadata connection, and a restricted query connection to the application database. The last one uses `QUERY_DB_URL`; development can fall back to the app role when it is absent, while production configuration requires it.
+The API opens three logical pools: an application connection, a metadata connection, and a restricted query connection to the application database. `QUERY_DB_URL` is required in every environment. Query execution rejects superuser, BYPASSRLS, and lending-table-owner roles. Authenticated identity is set transaction-locally, and branch RLS applies to all seven lending tables.
 
 Ollama runs separately from the application. Cloud integrations use server-side API keys or the AWS SDK credential chain. Admin configuration never returns credentials to the browser and does not accept arbitrary provider URLs. The Next proxy is optional: the current browser client uses `NEXT_PUBLIC_API_URL` directly, so CORS configuration remains relevant.
 
 ### Key Architectural Decisions
 
 - Shared oRPC contracts are the API source of truth. Public DTOs are independent from Drizzle database records.
-- LLM output remains untrusted. SQL runs only after validation and a user-bound draft-token check or a user-owned saved-query lookup. Saved runs also recheck active metadata.
+- LLM output remains untrusted. The model emits a strict query plan, never SQL. The application compiles approved projections, relationship IDs, aggregates, filters, grouping, and sorting. Every run recompiles the signed or saved plan against current metadata.
+- Explicit clarification or unsupported outcomes stop generation without fallback to a model that might guess. A versioned semantic evaluation corpus and independent PostgreSQL isolation tests cover these boundaries.
 - IT-Admin permissions are checked against the current database role on every admin request. Role assignment is SQL-only. Database provider settings override environment defaults on subsequent requests.
 
 ## Component Relationships
@@ -184,7 +185,7 @@ Paths are relative to the repository root.
 
 - The query role is provisioned by a separate script, not automatically by application startup or migrations.
 - AST validation, a read-only transaction, timeout, row cap, and least-privilege grants are complementary safeguards, not a general-purpose SQL sandbox.
-- Metadata is not a per-user data authorization policy. Add row-level security or tenant scoping before a multi-tenant deployment.
+- Explicit `user_branch_access` grants provide a default-deny branch policy. `IT-Admin` does not imply portfolio access. This policy is not a general tenant or relationship-manager authorization system and needs business review before deployment.
 - Access JWTs are one hour; generated-query tokens are ten minutes. Admin role revocation is immediate at the API boundary, but general session revocation/refresh tokens are not implemented.
 - Vector columns and indexes exist, but the document search repository currently implements lexical full-text search, not hybrid vector retrieval.
 - Both Drizzle configs share schema exports and the migration directory. Inspect both database migration histories when changing the schema.

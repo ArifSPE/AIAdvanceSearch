@@ -2,6 +2,8 @@ export interface ModelCandidate {
   modelId: string
 }
 
+export class NonRetryableGenerationError extends Error {}
+
 export interface ModelGenerationResult<T, M extends ModelCandidate> {
   value: T
   model: M
@@ -18,6 +20,7 @@ export async function generateWithFallback<M extends ModelCandidate, T>(
     try {
       return { value: await generate(model), model, attempts: index + 1 }
     } catch (error) {
+      if (error instanceof NonRetryableGenerationError) throw error
       errors.push(error)
     }
   }

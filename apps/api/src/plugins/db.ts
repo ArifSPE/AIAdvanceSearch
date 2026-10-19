@@ -18,15 +18,11 @@ export default fp(
     app.decorate('db', appDatabase.db)
     app.decorate('metadataDb', metadataDatabase.db)
 
-    // Generated SQL runs as a SELECT-only role; dev falls back to the app role (production requires it).
-    const queryDatabase = env.QUERY_DB_URL ? createQueryDatabase({ max: 5 }) : undefined
-    if (!queryDatabase) {
-      app.log.warn('QUERY_DB_URL is not set: generated queries run with the application database role')
-    }
-    app.decorate('queryDb', queryDatabase?.db ?? appDatabase.db)
+    const queryDatabase = createQueryDatabase({ max: 5 })
+    app.decorate('queryDb', queryDatabase.db)
 
     app.addHook('onClose', async () => {
-      await Promise.all([appDatabase.close(), metadataDatabase.close(), queryDatabase?.close()])
+      await Promise.all([appDatabase.close(), metadataDatabase.close(), queryDatabase.close()])
     })
   },
   { name: 'db' },

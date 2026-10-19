@@ -79,7 +79,7 @@ export const savedQueriesContract = {
       ...unauthorizedError,
       ...notFound,
       SAVED_QUERY_OUTDATED: {
-        message: 'This saved query uses tables or columns that are no longer available. Rebuild and save it again.',
+        message: 'This saved query needs regeneration with the current query plan or metadata. Edit and save it again.',
         status: 409,
       },
       QUERY_EXECUTION_FAILED: { message: 'The read-only query could not be executed', status: 400 },

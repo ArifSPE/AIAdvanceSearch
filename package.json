@@ -18,6 +18,7 @@
     "start": "pnpm --parallel --filter \"./apps/**\" start",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "eval:llm": "pnpm --filter @ais/api eval:llm",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @ais/db generate",

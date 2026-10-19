@@ -54,8 +54,9 @@ export function QueryLibrary({ onEdit, onNew }: { onEdit: (query: SavedQuery) =>
           <button type="button" disabled={busy} onClick={() => { setOpenedId(null); setExecution(null); setError('') }} className="flex items-center gap-2 text-sm text-ink-muted hover:text-ink"><ArrowLeft size={16} />Library</button>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1"><h2 className="break-words text-xl font-semibold">{opened.name}</h2><p className="mt-1 text-sm text-ink-muted">{opened.question || opened.explanation}</p></div>
-            <div className="flex items-center gap-2"><button type="button" disabled={busy || invalidFilters} onClick={() => void run(opened)} className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"><Play size={16} />{busy ? 'Running...' : 'Run'}</button>{actions(opened)}</div>
+            <div className="flex items-center gap-2"><button type="button" disabled={busy || invalidFilters || !opened.plan} onClick={() => void run(opened)} className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"><Play size={16} />{busy ? 'Running...' : 'Run'}</button>{actions(opened)}</div>
           </div>
+          {!opened.plan && <div role="status" className="border-l-2 border-amber-500 pl-3 text-sm">This legacy SQL query needs a validated plan. <button type="button" onClick={() => onEdit(opened)} className="text-accent underline">Edit and regenerate</button></div>}
           {opened.filters.length > 0 && <FilterParameters title="Run parameters" filters={opened.filters} values={filterValues} disabled={busy} onValuesChange={(values) => { setFilterValues(values); setExecution(null); setError('') }} />}
           <details className="border-y border-line py-3"><summary className="cursor-pointer text-sm text-ink-muted">Query details</summary>
             <p className="mt-3 text-sm text-ink-muted">{opened.explanation}</p>

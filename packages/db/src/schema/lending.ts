@@ -28,7 +28,7 @@ export const branches = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('branches_code_unique').on(table.code)],
-)
+).enableRLS()
 
 export const relationshipManagers = pgTable(
   'relationship_managers',
@@ -47,7 +47,7 @@ export const relationshipManagers = pgTable(
     uniqueIndex('relationship_managers_email_unique').on(table.email),
     index('relationship_managers_branch_idx').on(table.branchId),
   ],
-)
+).enableRLS()
 
 export const borrowers = pgTable(
   'borrowers',
@@ -74,7 +74,7 @@ export const borrowers = pgTable(
     index('borrowers_relationship_manager_idx').on(table.relationshipManagerId),
     index('borrowers_industry_idx').on(table.industry),
   ],
-)
+).enableRLS()
 
 export const loans = pgTable(
   'loans',
@@ -100,7 +100,7 @@ export const loans = pgTable(
     index('loans_status_idx').on(table.status),
     index('loans_maturity_date_idx').on(table.maturityDate),
   ],
-)
+).enableRLS()
 
 export const loanPayments = pgTable(
   'loan_payments',
@@ -122,7 +122,7 @@ export const loanPayments = pgTable(
     index('loan_payments_loan_idx').on(table.loanId),
     index('loan_payments_due_status_idx').on(table.dueDate, table.status),
   ],
-)
+).enableRLS()
 
 export const collateral = pgTable(
   'collateral',
@@ -143,7 +143,7 @@ export const collateral = pgTable(
     uniqueIndex('collateral_reference_unique').on(table.referenceCode),
     index('collateral_loan_idx').on(table.loanId),
   ],
-)
+).enableRLS()
 
 export const customerContacts = pgTable(
   'customer_contacts',
@@ -166,7 +166,7 @@ export const customerContacts = pgTable(
     index('customer_contacts_borrower_contacted_idx').on(table.borrowerId, table.contactedAt),
     index('customer_contacts_manager_idx').on(table.relationshipManagerId),
   ],
-)
+).enableRLS()
 
 export const branchesRelations = relations(branches, ({ many }) => ({
   relationshipManagers: many(relationshipManagers),

@@ -3,6 +3,8 @@ import { config } from 'dotenv'
 import { afterAll, describe, expect, it } from 'vitest'
 import { createAccessToken } from '../src/modules/auth/tokens'
 import { createGeneratedQueryToken } from '../src/modules/llm/query-token'
+import { users, eq } from '@ais/db'
+import { grantFixtureBranches, loanDraft } from './helpers/query-draft'
 
 config({ path: resolve(process.cwd(), '../../.env'), quiet: true })
 
@@ -15,8 +17,10 @@ const runIntegrationTests = Boolean(
 if (runIntegrationTests) {
   describe('LLM query-generation API integration', () => {
     let app: Awaited<ReturnType<(typeof import('../src/server'))['buildServer']>> | undefined
+    let executionUserId: string | undefined
 
     afterAll(async () => {
+      if (app && executionUserId) await app.db.delete(users).where(eq(users.id, executionUserId))
       await app?.close()
     })
 
@@ -61,18 +65,11 @@ if (runIntegrationTests) {
       const { buildServer } = await import('../src/server')
       app ??= await buildServer()
       const user = { id: crypto.randomUUID(), email: 'llm-run-test@example.test' }
+      executionUserId = user.id
+      await app.db.insert(users).values(user)
+      await grantFixtureBranches(app.db, user.id)
       const accessToken = await createAccessToken(user)
-      const queryToken = await createGeneratedQueryToken(user.id, {
-        sql: 'SELECT loan_number, outstanding_balance FROM loans ORDER BY loan_number',
-        explanation: 'Lists demo loans and current balances.',
-        provider: 'ollama',
-        model: 'test-model',
-        tables: [{ name: 'loans', columns: ['loan_number', 'outstanding_balance'] }],
-        columnTypes: {
-          'loans.loan_number': 'text',
-          'loans.outstanding_balance': 'numeric',
-        },
-      })
+      const queryToken = (await loanDraft(app.metadataDb, user.id, { columns: ['loan_number', 'outstanding_balance'], order: 'asc', question: 'List loans' })).token
 
       const response = await app.inject({
         method: 'POST',

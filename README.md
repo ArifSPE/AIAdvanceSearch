@@ -133,7 +133,7 @@ See [.env.example](.env.example) for the complete environment template. `.env` i
 | --- | --- |
 | `APP_DB_URL` | Application data and authentication connection |
 | `METADATA_DB_URL` | Entity and column metadata connection |
-| `QUERY_DB_URL` | Dedicated generated-query role; required in production |
+| `QUERY_DB_URL` | Dedicated non-owner, non-bypass query role; required in every environment |
 | `JWT_SECRET` | Stable JWT signing secret, at least 32 characters |
 | `NEXT_PUBLIC_API_URL` | Browser-visible API origin and prefix |
 | `API_URL` | Server-side destination for the optional Next proxy |
@@ -186,7 +186,33 @@ Filter controls derive from column metadata: numeric inputs respect precision/sc
 
 Saving stores both filter definitions and the current default values. Saved-query runs accept value overrides only, not SQL or replacement filter definitions. Overrides do not change stored defaults; **Reset defaults** restores them. To persist different defaults, edit the query and save changes. Changing a value does not require another LLM call, while adding/removing a condition or changing an operator requires SQL regeneration.
 
-Managed filters combine with **AND** and currently support direct SELECT/JOIN queries, not CTEs or UNION queries. The model generates the unfiltered query structure; the server adds filter predicates through the SQL AST and binds values as Drizzle parameters. Unsupported or invalid SQL is rejected rather than executed. Existing saved queries without filters continue to run as before.
+Managed filters combine with **AND** and support direct SELECT/JOIN plans, not CTEs or UNIONs. The model returns a strict structured plan, never SQL. The application resolves approved relationship IDs, validates projections/grouping/aggregates, compiles SQL, and binds values as Drizzle parameters. Ambiguous questions return a clarification; unsupported questions return a rejection without an executable draft. Deliberate decisions do not trigger model fallback.
+
+Saved queries now store a canonical plan alongside their compiled SQL and filter defaults. Plans are recompiled against current metadata on every run. Older SQL-only saved queries remain visible but must be edited and regenerated before execution.
+
+### Row-Level Entitlements
+
+Lending data is default-deny. The seven lending tables use PostgreSQL RLS and explicit `user_branch_access` grants; an `IT-Admin` role does not grant business-data access. Missing grants produce zero rows. Borrowers, loans, payments, collateral, contacts, and relationship managers inherit the branch boundary.
+
+Use an authorized database-administration account to grant a specific branch in the application database:
+
+```sql
+INSERT INTO user_branch_access (user_id, branch_id)
+SELECT users.id, branches.id
+FROM users CROSS JOIN branches
+WHERE users.email = 'your-email@example.com'
+  AND branches.code = 'NYC-01'
+ON CONFLICT DO NOTHING;
+```
+
+Revoke that user's grants with:
+
+```sql
+DELETE FROM user_branch_access
+WHERE user_id = (SELECT id FROM users WHERE email = 'your-email@example.com');
+```
+
+The authenticated user ID is set transaction-locally on the restricted query connection and is cleared at commit/rollback. The backend rejects superuser, BYPASSRLS, and lending-table-owner execution connections. There is no development fallback to the application role. Seeds and migrations grant no users automatic portfolio access. This initial branch-based policy must be reviewed against the real business entitlement model before production.
 
 ### Assign an Administrator
 
@@ -204,14 +230,15 @@ Administrators can publish/unpublish, categorize, order, edit, and delete prompt
 
 ## SQL Execution Safeguards
 
-- The browser submits a user-bound signed draft token, not arbitrary SQL. Draft tokens expire after ten minutes; saved SQL is persisted separately and can be run later.
+- The model emits a strict query plan with no SQL, expressions, or arbitrary function fields. The application compiles approved identifiers, joins, aggregates, filters, grouping, and sorting.
+- The browser submits a user-bound signed plan/draft token, not arbitrary SQL. Draft tokens expire after ten minutes; saved plans can be run later after recompilation and metadata validation.
 - `pgsql-ast-parser` validates a single read-only statement, table and column references, unique output names, and allowed function calls. `count(*)` is allowed; wildcard column selection is blocked.
 - Validated SQL structure runs through Drizzle in a read-only transaction, with a five-second statement timeout and a 200-row response cap. Editable filter values are bound separately as SQL parameters; they are never inserted into raw SQL text.
 - `pnpm db:query-role` provisions the role in `QUERY_DB_URL` with `SELECT` access to the supported lending tables. Re-run it after changing the queryable table allowlist.
-- Production requires `QUERY_DB_URL`. Development currently falls back to the application role, with a warning, if it is absent; do not rely on that fallback for untrusted queries.
+- Every environment requires `QUERY_DB_URL`; execution rejects privileged roles and applies transaction-scoped identity under branch RLS.
 - Provider output is untrusted. JSON-schema-constrained output helps parsing; it does not guarantee correct or safe SQL. Validation can reject a model response.
 
-These checks are defense in depth, not a complete SQL sandbox or tenant-authorization system. Review database privileges, row-level security, function/extension access, network access, and data sensitivity before deployment. Schema metadata and user questions are sent to the selected LLM provider. The LLM generation flow does not receive query results.
+These checks are defense in depth, not a claim of production certification. The implemented authorization policy is branch-based, not a general-purpose tenancy or relationship-manager entitlement system. Review privileges, RLS policies, metadata correctness, function/extension access, and data sensitivity before deployment. Schema metadata and user questions are sent to the selected LLM provider; query results are not.
 
 ## API Overview
 
@@ -247,6 +274,22 @@ LOG_LEVEL=silent RUN_DB_INTEGRATION_TESTS=true pnpm --filter @ais/api test
 ```
 
 Database integration tests create and clean up temporary users/rows. The administration suite temporarily changes Ollama settings and restores them; use a disposable local database, not production. These tests do not require paid LLM calls. Browser checks for live model quality are separate.
+
+### LLM Evaluation
+
+`apps/api/evals/query-planner.v1.json` contains 120 versioned prompts in 24 scenario families: 40 clear, 40 ambiguous, and 40 unsupported/adversarial requests. Ready cases include application-owned reference plans; model evaluation compares semantic plan structure, not SQL text. Offline tests validate the corpus and reference compiler. Separate PostgreSQL tests verify expected rows, cross-branch isolation, grant revocation, and identity cleanup on a one-connection pool.
+
+Live evaluation is explicitly opt-in and may incur provider charges:
+
+```sh
+pnpm eval:llm --live --provider bedrock --limit 5
+pnpm eval:llm --live --provider bedrock --case ambiguous-large --limit 1
+pnpm eval:llm --live --provider bedrock --limit 120
+```
+
+Use `--model` to select an allowed model. Reports under ignored `.eval-results/` record the corpus version, requested provider/model, actual model, outcome, duration, semantic match, and unsafe acceptances. The runner exits nonzero on any failure. Fallback remains part of the tested provider configuration and the actual successful model is recorded. Version the corpus and rerun it after model, prompt, compiler, or metadata changes.
+
+This is a starter corpus, not an exhaustive production evaluation. It contains paraphrase variants and currently focuses model scoring on single-table planning; expand it with organization-specific definitions, dates/currency, join ambiguity, and result-set oracles before release. Do not treat a passing offline suite as evidence that a cloud model passed all 120 prompts.
 
 | Command | Purpose |
 | --- | --- |

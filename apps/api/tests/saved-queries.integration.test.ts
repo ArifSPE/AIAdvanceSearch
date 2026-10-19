@@ -5,6 +5,7 @@ import { createGeneratedQueryToken } from '../src/modules/llm/query-token'
 import { defineQueryFilter } from '@ais/shared'
 import { TableMetadataService } from '../src/modules/metadata/tablemetadata.service'
 import { addQueryFilters } from '../src/modules/llm/query-filters'
+import { grantFixtureBranches, loanDraft } from './helpers/query-draft'
 
 describe.skipIf(process.env.RUN_DB_INTEGRATION_TESTS !== 'true')('Saved queries API integration', () => {
   let app: Awaited<ReturnType<(typeof import('../src/server'))['buildServer']>>
@@ -14,6 +15,7 @@ describe.skipIf(process.env.RUN_DB_INTEGRATION_TESTS !== 'true')('Saved queries 
   let otherAuthorization: string
   let savedId: string
   let queryToken: string
+  let initialSql: string
   const name = `Loans ${crypto.randomUUID()}`
 
   beforeAll(async () => {
@@ -21,17 +23,12 @@ describe.skipIf(process.env.RUN_DB_INTEGRATION_TESTS !== 'true')('Saved queries 
     app = await buildServer()
     connection = createAppDatabase({ max: 1 })
     await connection.db.insert(users).values({ id: userId, email: `saved-${userId}@example.test` })
+    await grantFixtureBranches(connection.db, userId)
     authorization = `Bearer ${await createAccessToken({ id: userId, email: `saved-${userId}@example.test` })}`
     otherAuthorization = `Bearer ${await createAccessToken({ id: crypto.randomUUID(), email: 'other-saved@example.test' })}`
-    queryToken = await createGeneratedQueryToken(userId, {
-      question: 'List loans',
-      sql: 'SELECT loan_number FROM loans ORDER BY loan_number',
-      explanation: 'Lists loans.',
-      provider: 'ollama',
-      model: 'test-model',
-      tables: [{ name: 'loans', columns: ['loan_number'] }],
-      columnTypes: { 'loans.loan_number': 'text' },
-    })
+    const draft = await loanDraft(app.metadataDb, userId, { columns: ['loan_number'], order: 'asc', question: 'List loans' })
+    queryToken = draft.token
+    initialSql = draft.sql
   })
 
   afterAll(async () => {
@@ -110,12 +107,7 @@ describe.skipIf(process.env.RUN_DB_INTEGRATION_TESTS !== 'true')('Saved queries 
       defineQueryFilter({ id: 'minimum_balance', table: 'loans', column: 'outstanding_balance', operator: 'gte', defaultValue: '500000' }, numericColumn, table.display_name),
       defineQueryFilter({ id: 'loan_status', table: 'loans', column: 'status', operator: 'eq', defaultValue: 'active' }, statusColumn, table.display_name),
     ]
-    const parameterizedSql = addQueryFilters('SELECT loan_number, outstanding_balance FROM loans ORDER BY loan_number', filters)
-    const draft = await createGeneratedQueryToken(userId, {
-      question: 'List active high-balance loans', sql: parameterizedSql, explanation: 'Lists active loans with an editable minimum balance.',
-      provider: 'ollama', model: 'test-model', tables: [{ name: 'loans', columns: ['loan_number', 'outstanding_balance', 'status'] }],
-      columnTypes: { 'loans.loan_number': 'text', 'loans.outstanding_balance': 'numeric', 'loans.status': 'loan_status' }, filters,
-    })
+    const draft = (await loanDraft(app.metadataDb, userId, { columns: ['loan_number', 'outstanding_balance'], filters, order: 'asc', question: 'List active high-balance loans' })).token
     const saved = await app.inject({ method: 'POST', url: '/api/v1/saved-queries', headers: { authorization }, payload: { name: `${name} parameters`, queryToken: draft, filterValues: { minimum_balance: '700000' } } })
     expect(saved.statusCode).toBe(201)
     expect(saved.json().filters[0].defaultValue).toBe('700000')
@@ -148,10 +140,7 @@ describe.skipIf(process.env.RUN_DB_INTEGRATION_TESTS !== 'true')('Saved queries 
     const table = tables.find((candidate) => candidate.name === 'loans')!
     const column = table.columns.find((candidate) => candidate.name === 'loan_number')!
     const filter = defineQueryFilter({ id: 'loan_number', table: 'loans', column: 'loan_number', operator: 'eq', defaultValue: 'LN-1001' }, column, table.display_name)
-    const draft = await createGeneratedQueryToken(userId, {
-      question: 'Find a loan by number', sql: addQueryFilters('SELECT loan_number FROM loans', [filter]), explanation: 'Exact loan number lookup.',
-      provider: 'ollama', model: 'test-model', tables: [{ name: 'loans', columns: ['loan_number'] }], columnTypes: { 'loans.loan_number': 'text' }, filters: [filter],
-    })
+    const draft = (await loanDraft(app.metadataDb, userId, { columns: ['loan_number'], filters: [filter], question: 'Find a loan by number' })).token
     const saved = await app.inject({ method: 'POST', url: '/api/v1/saved-queries', headers: { authorization }, payload: { name: `${name} text filter`, queryToken: draft } })
     expect(saved.statusCode).toBe(201)
     const match = await app.inject({ method: 'POST', url: `/api/v1/saved-queries/${saved.json().id}/run`, headers: { authorization } })
@@ -171,7 +160,7 @@ describe.skipIf(process.env.RUN_DB_INTEGRATION_TESTS !== 'true')('Saved queries 
   it('renames without changing SQL and duplicates without replacing the original', async () => {
     const renamed = await app.inject({ method: 'PATCH', url: `/api/v1/saved-queries/${savedId}`, headers: { authorization }, payload: { name: `${name} renamed` } })
     expect(renamed.statusCode).toBe(200)
-    expect(renamed.json()).toMatchObject({ id: savedId, name: `${name} renamed`, sql: 'SELECT loan_number FROM loans ORDER BY loan_number' })
+    expect(renamed.json()).toMatchObject({ id: savedId, name: `${name} renamed`, sql: initialSql })
     const copy = await app.inject({ method: 'POST', url: `/api/v1/saved-queries/${savedId}/copy`, headers: { authorization }, payload: { name: `${name} copy` } })
     expect(copy.statusCode).toBe(201)
     expect(copy.json().id).not.toBe(savedId)
@@ -190,13 +179,10 @@ describe.skipIf(process.env.RUN_DB_INTEGRATION_TESTS !== 'true')('Saved queries 
   })
 
   it('updates a query from a signed draft while keeping its ID', async () => {
-    const token = await createGeneratedQueryToken(userId, {
-      question: 'List latest loan numbers', sql: 'SELECT loan_number FROM loans ORDER BY loan_number DESC', explanation: 'Lists loan numbers descending.',
-      provider: 'ollama', model: 'test-model', tables: [{ name: 'loans', columns: ['loan_number'] }], columnTypes: { 'loans.loan_number': 'text' },
-    })
-    const response = await app.inject({ method: 'PATCH', url: `/api/v1/saved-queries/${savedId}`, headers: { authorization }, payload: { name, queryToken: token, outputOrder: ['loans.loan_number'] } })
+    const draft = await loanDraft(app.metadataDb, userId, { columns: ['loan_number'], order: 'desc', question: 'List latest loan numbers' })
+    const response = await app.inject({ method: 'PATCH', url: `/api/v1/saved-queries/${savedId}`, headers: { authorization }, payload: { name, queryToken: draft.token, outputOrder: ['loans.loan_number'] } })
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toMatchObject({ id: savedId, name, question: 'List latest loan numbers', sql: 'SELECT loan_number FROM loans ORDER BY loan_number DESC', lastRunAt: null })
+    expect(response.json()).toMatchObject({ id: savedId, name, question: 'List latest loan numbers', sql: draft.sql, lastRunAt: null })
   })
 
   it('rejects outdated metadata before executing SQL', async () => {

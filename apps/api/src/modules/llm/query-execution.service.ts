@@ -4,6 +4,8 @@ import { executeQueryResponseSchema } from '@ais/shared'
 import { assertReadOnlySql } from './sql-validation'
 import { verifyGeneratedQueryToken, type GeneratedQueryTokenPayload } from './query-token'
 import { bindQueryFilters } from './query-filters'
+import { compileQueryPlan } from './query-plan'
+import { TableMetadataService } from '../metadata/tablemetadata.service'
 
 const maxRows = 200
 const statementTimeoutMs = 5000
@@ -33,22 +35,33 @@ function toJsonValue<T>(value: T): T {
 }
 
 export class QueryExecutionService {
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database, private readonly metadataDb?: Database) {}
 
   async execute(queryToken: string, userId: string, filterValues?: FilterValues): Promise<ExecuteQueryResponse> {
     const query = await verifyGeneratedQueryToken(queryToken, userId)
-    return this.run(query, queryToken, filterValues)
+    return this.run(query, queryToken, userId, filterValues)
   }
 
   /** Validates and runs an already-trusted query payload read-only. */
-  async run(query: GeneratedQueryTokenPayload, queryToken: string, filterValues?: FilterValues): Promise<ExecuteQueryResponse> {
-    assertReadOnlySql(query.sql, query.tables)
+  async run(query: GeneratedQueryTokenPayload, queryToken: string, userId: string, filterValues?: FilterValues): Promise<ExecuteQueryResponse> {
+    if (!query.plan || !this.metadataDb) throw new Error('A validated query plan and current metadata are required; regenerate legacy drafts')
+    const { tables } = await new TableMetadataService(this.metadataDb).getSchema()
+    const compiled = compileQueryPlan(query.plan, tables)
+    if (compiled.sql !== query.sql) throw new Error('Stored SQL does not match the validated query plan')
+    assertReadOnlySql(compiled.sql, query.tables)
 
     const querySql = query.sql.replace(/;\s*$/, '')
-    const boundSql = bindQueryFilters(querySql, query.filters ?? [], filterValues)
+    const boundSql = bindQueryFilters(querySql, compiled.filters, filterValues)
     const cappedSql = sql`SELECT * FROM (${boundSql}) AS generated_query LIMIT ${maxRows + 1}`
     const rawRows = await this.db.transaction(async (transaction) => {
       await transaction.execute(sql`SET TRANSACTION READ ONLY`)
+      const roleRows = await transaction.execute(sql`SELECT role_info.rolsuper OR role_info.rolbypassrls OR EXISTS (
+        SELECT 1 FROM pg_catalog.pg_class table_info JOIN pg_catalog.pg_namespace namespace_info ON namespace_info.oid = table_info.relnamespace
+        WHERE namespace_info.nspname = 'public' AND table_info.relname IN ('branches', 'relationship_managers', 'borrowers', 'loans', 'loan_payments', 'collateral', 'customer_contacts', 'user_branch_access')
+          AND (table_info.relowner = role_info.oid OR NOT table_info.relrowsecurity OR NOT table_info.relforcerowsecurity)
+      ) AS unsafe FROM pg_catalog.pg_roles role_info WHERE role_info.rolname = current_user`)
+      if ((roleRows as unknown as Array<{ unsafe: boolean }>)[0]?.unsafe !== false) throw new Error('Query execution requires a non-owner, non-superuser role without BYPASSRLS and enforced RLS on lending tables')
+      await transaction.execute(sql`SELECT set_config('app.user_id', ${userId}, true)`)
       await transaction.execute(
         sql`SELECT set_config('statement_timeout', ${`${statementTimeoutMs}ms`}, true)`,
       )
@@ -79,7 +92,8 @@ export class QueryExecutionService {
       provider: query.provider,
       model: query.model,
       queryToken,
-      filters: query.filters ?? [],
+      filters: compiled.filters,
+      plan: compiled.plan,
       result: { columns, rows, rowCount: rows.length, truncated },
     })
   }

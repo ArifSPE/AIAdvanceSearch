@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { filterValuesSchema, queryFilterInputSchema, queryFilterSchema } from './query-filter'
+import { queryPlanSchema } from './query-plan'
 
 export const llmProviderSchema = z.enum(['ollama', 'openai', 'anthropic', 'bedrock'])
 
@@ -63,6 +64,7 @@ export const generatedQuerySchema = z.object({
   model: z.string().min(1),
   queryToken: z.string().min(1),
   filters: z.array(queryFilterSchema).max(20).default([]),
+  plan: queryPlanSchema.nullable().default(null),
 })
 
 export const selectionRecommendationInputSchema = z.object({

@@ -29,7 +29,7 @@ async function main() {
     // Utility statements take no bind parameters, so Postgres quotes the role and password.
     const [statement] = await sql<{ ddl: string }[]>`
       select format(
-        ${`${verb} ROLE %I WITH LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`}::text,
+        ${`${verb} ROLE %I WITH LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT`}::text,
         ${role}::text,
         ${password}::text
       ) as ddl`
@@ -46,6 +46,7 @@ async function main() {
     for (const table of LENDING_TABLE_NAMES) {
       await sql`GRANT SELECT ON TABLE ${sql(`public.${table}`)} TO ${sql(role)}`
     }
+    await sql`GRANT SELECT ON TABLE public.user_branch_access TO ${sql(role)}`
 
     console.log(
       `${exists ? 'updated' : 'created'} read-only role "${role}" with SELECT on ${LENDING_TABLE_NAMES.length} tables`,

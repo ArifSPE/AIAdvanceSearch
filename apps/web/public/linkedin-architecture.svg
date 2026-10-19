@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600" viewBox="0 0 1600 1600" role="img" aria-labelledby="title description">
   <title id="title">AI Advance Search: The LLM proposes. The backend decides.</title>
-  <desc id="description">Architecture diagram separating the user interface, LLM, metadata database, application backend, and application database. The backend validates SQL proposals and binds filter values before restricted read-only execution. Normal application CRUD uses a separate application role.</desc>
+  <desc id="description">Architecture diagram separating the user interface, LLM, metadata database, application backend, and application database. The LLM proposes a typed query plan, never SQL. The backend validates and compiles the plan, binds values, and executes with branch-level row security. Normal application CRUD uses a separate application role.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M 0 0 L 9 5 L 0 10 Z" fill="#34755d"/></marker>
     <marker id="amberArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M 0 0 L 9 5 L 0 10 Z" fill="#ae7626"/></marker>
@@ -34,8 +34,8 @@
     <text x="600" y="711" font-size="24" font-weight="600" fill="#ffffff">Authenticate and authorize</text>
     <text x="600" y="746" font-size="20" fill="#c0d6c8">User identity and ownership checks</text>
     <text x="552" y="799" font-size="17" font-weight="600" fill="#a6daba">02</text>
-    <text x="600" y="799" font-size="24" font-weight="600" fill="#ffffff">Validate the SQL proposal</text>
-    <text x="600" y="834" font-size="20" fill="#c0d6c8">AST, table/column and function rules</text>
+    <text x="600" y="799" font-size="24" font-weight="600" fill="#ffffff">Validate and compile plan</text>
+    <text x="600" y="834" font-size="20" fill="#c0d6c8">Approved columns, joins, filters, aggregates</text>
     <text x="552" y="887" font-size="17" font-weight="600" fill="#a6daba">03</text>
     <text x="600" y="887" font-size="24" font-weight="600" fill="#ffffff">Bind values and execute</text>
     <text x="600" y="922" font-size="20" fill="#c0d6c8">Typed filters become SQL parameters</text>
@@ -45,7 +45,7 @@
     <rect x="72" y="609" width="352" height="265" rx="8" fill="#fff9ee" stroke="#d1b78e" stroke-width="2"/>
     <text x="98" y="657" font-size="31" font-weight="600" fill="#62451e">LLM</text>
     <text x="98" y="698" font-size="22" fill="#735b39">Recommend a selection</text>
-    <text x="98" y="734" font-size="22" fill="#735b39">Propose a SQL draft</text>
+    <text x="98" y="734" font-size="22" fill="#735b39">Propose a typed query plan</text>
     <line x1="98" y1="759" x2="398" y2="759" stroke="#ddc9a9"/>
     <text x="98" y="797" font-size="20" font-weight="600" fill="#62451e">No direct DB connection</text>
     <text x="98" y="835" font-size="18" fill="#735b39">Ollama or supported cloud model</text>
@@ -53,7 +53,7 @@
     <path d="M 520 629 L 466 629 L 466 555 L 248 555 L 248 605" fill="none" stroke="#34755d" stroke-width="2.5" marker-end="url(#arrow)"/>
     <text x="250" y="534" text-anchor="middle" font-size="21" fill="#356449">Question + schema metadata</text>
     <path d="M 248 874 L 248 946 L 516 946" fill="none" stroke="#ae7626" stroke-width="2.5" marker-end="url(#amberArrow)"/>
-    <text x="252" y="986" text-anchor="middle" font-size="22" font-weight="600" fill="#8b5c1b">Untrusted SQL proposal</text>
+    <text x="252" y="986" text-anchor="middle" font-size="22" font-weight="600" fill="#8b5c1b">Untrusted query plan</text>
 
     <rect x="1176" y="609" width="352" height="265" rx="8" fill="#ffffff" stroke="#b9cabe" stroke-width="2"/>
     <text x="1202" y="657" font-size="29" font-weight="600" fill="#172d25">Metadata layer</text>
@@ -73,7 +73,7 @@
 
     <rect x="410" y="1184" width="780" height="151" rx="8" fill="#ffffff" stroke="#8eaf9b" stroke-width="2"/>
     <text x="800" y="1230" text-anchor="middle" font-size="29" font-weight="600" fill="#172d25">Application PostgreSQL</text>
-    <text x="800" y="1270" text-anchor="middle" font-size="22" fill="#356449">Restricted query role: SELECT on permitted tables</text>
+    <text x="800" y="1270" text-anchor="middle" font-size="22" fill="#356449">Branch RLS + restricted query role</text>
     <text x="800" y="1308" text-anchor="middle" font-size="19" fill="#536c5e">Business data / users / saved queries / settings</text>
     <path d="M 1080 982 L 1300 982 L 1300 1258 L 1194 1258" fill="none" stroke="#778681" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#greyArrow)"/>
     <text x="1321" y="1098" font-size="20" fill="#61756a">Separate app role</text>
@@ -82,7 +82,7 @@
     <line x1="72" y1="1393" x2="1528" y2="1393" stroke="#c3d1c7"/>
     <text x="75" y="1441" font-size="27" font-weight="600" fill="#172d25">The model recommends. It does not execute.</text>
     <text x="75" y="1482" font-size="22" fill="#536c5e">The backend controls catalog access, validation, parameters, and execution.</text>
-    <text x="75" y="1531" font-size="18" fill="#61756a">Restricted execution requires QUERY_DB_URL. Development fallback uses the app role.</text>
+    <text x="75" y="1531" font-size="18" fill="#61756a">QUERY_DB_URL required. No privileged-role fallback. Missing branch grants return no rows.</text>
     <text x="75" y="1561" font-size="18" fill="#61756a">Defense in depth, not a complete SQL sandbox. Schema metadata and questions are shared with the selected LLM.</text>
   </g>
 </svg>

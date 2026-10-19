@@ -8,15 +8,18 @@ import { TableMetadataService } from '../metadata/tablemetadata.service'
 import { createLanguageModels } from './model'
 import { generateWithFallback } from './model-fallback'
 import { resolveLlmModel } from './query-generation.service'
+import { ambiguityPolicy, QueryPlanningDecisionError } from './planning-decision'
 
 const maxTables = 8
 
 const recommendationOutputSchema = z.object({
+  status: z.enum(['ready', 'clarification', 'unsupported']),
+  clarification: z.string().max(1000).nullable(),
   outputColumns: z.array(z.string()),
   joinTables: z.array(z.string()),
   explanation: z.string(),
   filters: z.array(z.object({ table: z.string(), column: z.string(), operator: filterOperatorSchema, defaultValue: z.string().nullable() })).max(20),
-})
+}).strict()
 
 export class NoMatchingSchemaError extends Error {
   constructor() {
@@ -36,6 +39,9 @@ const system = [
   'filters: recommend editable row filters explicitly requested in the question. Use column types and descriptions to identify filter columns and sensible default values. Return no filters if none are needed.',
   'Return defaultValue as a string, or null for isNull/isNotNull. Use true or false for boolean strings, ISO dates for dates, and timezone-qualified ISO timestamps for timestamps. Resolve relative dates using currentDate. Use gte/lte for date ranges. Do not invent filters or use SQL expressions as values.',
   'All filters combine with AND. Do not represent OR alternatives as separate equality filters. Mention conditions that cannot be represented with the supported operators in your explanation.',
+  'Return status=ready only when the question has a clear, supported interpretation. Otherwise provide a specific clarification question or unsupported explanation and empty selections/filters.',
+  'If a filter needs a table not present in outputColumns, include that table in joinTables. Never silently discard requested conditions.',
+  ambiguityPolicy,
 ].join('\n')
 
 export class SelectionRecommendationService {
@@ -75,7 +81,10 @@ export class SelectionRecommendationService {
         timeout: { stepMs: llmConfig.timeoutMs, totalMs: llmConfig.timeoutMs },
         output: Output.object({ schema: recommendationOutputSchema }),
       })
-      return recommendationOutputSchema.parse(result.output)
+      const output = recommendationOutputSchema.parse(result.output)
+      if (output.status !== 'ready') throw new QueryPlanningDecisionError(output.status, output.clarification || output.explanation, candidate.modelId)
+      if (output.clarification !== null) throw new Error('A ready recommendation must not contain a clarification')
+      return output
     })
 
     // The model only proposes names; keep those that exist in the active catalog.
@@ -86,10 +95,10 @@ export class SelectionRecommendationService {
     for (const qualifiedName of generation.value.outputColumns) {
       const [tableName, columnName] = qualifiedName.trim().split('.')
       const table = tableName ? tableByName.get(tableName) : undefined
-      if (!table || !columnName || !table.columns.some((column) => column.name === columnName)) continue
+      if (!table || !columnName || !table.columns.some((column) => column.name === columnName)) throw new NoMatchingSchemaError()
       const tableColumns = columnsByTable.get(table.name) ?? []
       if (tableColumns.includes(columnName)) continue
-      if (!columnsByTable.has(table.name) && columnsByTable.size >= maxTables) continue
+      if (!columnsByTable.has(table.name) && columnsByTable.size >= maxTables) throw new NoMatchingSchemaError()
       columnsByTable.set(table.name, [...tableColumns, columnName])
       outputOrder.push(`${table.name}.${columnName}`)
     }
@@ -98,9 +107,11 @@ export class SelectionRecommendationService {
 
     for (const tableName of generation.value.joinTables) {
       const table = tableByName.get(tableName.trim())
-      if (!table || columnsByTable.has(table.name) || columnsByTable.size >= maxTables) continue
+      if (!table) throw new NoMatchingSchemaError()
+      if (columnsByTable.has(table.name)) continue
+      if (columnsByTable.size >= maxTables) throw new NoMatchingSchemaError()
       const primaryKeys = table.columns.filter((column) => column.is_primary_key).map((column) => column.name)
-      if (primaryKeys.length === 0) continue
+      if (primaryKeys.length === 0) throw new NoMatchingSchemaError()
       columnsByTable.set(table.name, primaryKeys)
       outputOrder.push(...primaryKeys.map((columnName) => `${table.name}.${columnName}`))
     }
@@ -109,10 +120,10 @@ export class SelectionRecommendationService {
     for (const proposed of generation.value.filters) {
       const table = tableByName.get(proposed.table)
       const column = table?.columns.find((candidate) => candidate.name === proposed.column)
-      if (!table || !column || !columnsByTable.has(table.name)) continue
+      if (!table || !column || !columnsByTable.has(table.name)) throw new NoMatchingSchemaError()
       const value = column.column_data_type === 'boolean' && ['true', 'false'].includes(proposed.defaultValue ?? '') ? proposed.defaultValue === 'true' : proposed.defaultValue
       try { filters.push(defineQueryFilter({ ...proposed, id: `filter_${filters.length + 1}`, defaultValue: value }, column, table.display_name)) }
-      catch { continue }
+      catch { throw new QueryPlanningDecisionError('clarification', `Please specify a valid value and supported operator for ${table.display_name}: ${column.display_name}.`) }
     }
 
     return {

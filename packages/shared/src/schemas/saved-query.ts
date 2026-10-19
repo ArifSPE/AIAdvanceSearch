@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { llmProviderSchema } from './llm'
 import { filterValuesSchema, queryFilterSchema } from './query-filter'
+import { queryPlanSchema } from './query-plan'
 
 export const savedQueryIdSchema = z.object({ id: z.uuid() })
 export const runSavedQueryInputSchema = savedQueryIdSchema.extend({ filterValues: filterValuesSchema })
@@ -38,6 +39,7 @@ export const savedQuerySchema = z.object({
   tableNames: z.array(z.string()),
   outputOrder: z.array(z.string()),
   filters: z.array(queryFilterSchema).max(20).default([]),
+  plan: queryPlanSchema.nullable().default(null),
   lastRunAt: z.string().nullable(),
   createdAt: z.string(),
 })

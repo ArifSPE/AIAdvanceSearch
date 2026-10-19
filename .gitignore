@@ -35,6 +35,7 @@ pnpm-debug.log*
 
 # test / coverage
 coverage/
+.eval-results/
 .vitest/
 
 # local data

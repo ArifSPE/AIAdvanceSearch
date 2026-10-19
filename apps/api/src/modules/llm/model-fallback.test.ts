@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { generateWithFallback } from './model-fallback'
+import { generateWithFallback, NonRetryableGenerationError } from './model-fallback'
 
 const models = [{ modelId: 'qwen2.5-coder:32b' }, { modelId: 'llama3.1:latest' }]
 
 describe('generateWithFallback', () => {
+  it('never retries a deliberate clarification or rejection', async () => {
+    const generate = vi.fn().mockRejectedValue(new NonRetryableGenerationError('Clarify the threshold'))
+    await expect(generateWithFallback(models, generate)).rejects.toThrow('Clarify the threshold')
+    expect(generate).toHaveBeenCalledOnce()
+  })
   it('uses the fallback model after the primary model fails', async () => {
     const generate = vi.fn(async (model: (typeof models)[number]) => {
       if (model.modelId === 'qwen2.5-coder:32b') throw new Error('model unavailable')

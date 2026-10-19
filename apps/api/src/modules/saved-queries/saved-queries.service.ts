@@ -1,7 +1,7 @@
 import { and, desc, eq, savedQueries, type Database, type SavedQueryRow } from '@ais/db'
-import { defineQueryFilter, llmProviderSchema, queryFilterSchema, type FilterValues, type ExecuteQueryResponse, type SaveQueryInput, type SavedQuery, type UpdateSavedQueryInput } from '@ais/shared'
+import { defineQueryFilter, llmProviderSchema, queryFilterSchema, queryPlanSchema, type FilterValues, type ExecuteQueryResponse, type SaveQueryInput, type SavedQuery, type UpdateSavedQueryInput } from '@ais/shared'
 import { QueryExecutionService } from '../llm/query-execution.service'
-import { createGeneratedQueryToken, verifyGeneratedQueryToken } from '../llm/query-token'
+import { createGeneratedQueryToken, verifyGeneratedQueryToken, InvalidGeneratedQueryTokenError } from '../llm/query-token'
 import { TableMetadataService } from '../metadata/tablemetadata.service'
 import { withFilterDefaults } from '../llm/query-filters'
 
@@ -45,6 +45,7 @@ function toSavedQuery(row: SavedQueryRow): SavedQuery {
     tableNames: row.tables.map((table) => table.name),
     outputOrder: row.outputOrder,
     filters: queryFilterSchema.array().parse(row.filters ?? []),
+    plan: row.plan ? queryPlanSchema.parse(row.plan) : null,
     lastRunAt: row.lastRunAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   }
@@ -70,6 +71,7 @@ export class SavedQueriesService {
   /** Stores a signed draft; throws InvalidGeneratedQueryTokenError if it is forged or expired. */
   async save(userId: string, input: SaveQueryInput): Promise<SavedQuery> {
     const draft = await verifyGeneratedQueryToken(input.queryToken, userId)
+    if (!draft.plan) throw new InvalidGeneratedQueryTokenError()
     try {
       const [row] = await this.db
         .insert(savedQueries)
@@ -85,6 +87,7 @@ export class SavedQueriesService {
           columnTypes: draft.columnTypes,
           outputOrder: input.outputOrder,
           filters: withFilterDefaults(draft.filters ?? [], input.filterValues),
+          plan: { ...draft.plan, filters: withFilterDefaults(draft.filters ?? [], input.filterValues).map(({ id, table, column, operator, defaultValue }) => ({ id, table, column, operator, defaultValue })) },
         })
         .returning()
       return toSavedQuery(row!)
@@ -101,6 +104,7 @@ export class SavedQueriesService {
       .where(and(eq(savedQueries.id, id), eq(savedQueries.userId, userId)))
       .limit(1)
     if (!row) throw new SavedQueryNotFoundError()
+    if (!row.plan) throw new SavedQueryOutdatedError('legacy SQL draft; regenerate as a validated query plan')
 
     // Deactivating a table or column in metadata also revokes saved queries that use it.
     const { tables: activeTables } = await new TableMetadataService(this.metadataDb).getSchema()
@@ -127,9 +131,10 @@ export class SavedQueriesService {
       tables: row.tables,
       columnTypes: row.columnTypes,
       filters,
+      plan: queryPlanSchema.parse(row.plan),
     }
     const queryToken = await createGeneratedQueryToken(userId, payload)
-    const response = await new QueryExecutionService(this.queryDb).run(payload, queryToken, filterValues)
+    const response = await new QueryExecutionService(this.queryDb, this.metadataDb).run(payload, queryToken, userId, filterValues)
 
     await this.db.update(savedQueries).set({ lastRunAt: new Date() }).where(eq(savedQueries.id, row.id))
     return response
@@ -140,6 +145,7 @@ export class SavedQueriesService {
       .where(and(eq(savedQueries.id, input.id), eq(savedQueries.userId, userId))).limit(1)
     if (!existing) throw new SavedQueryNotFoundError()
     const draft = input.queryToken ? await verifyGeneratedQueryToken(input.queryToken, userId) : undefined
+    if (draft && !draft.plan) throw new InvalidGeneratedQueryTokenError()
     try {
       const [row] = await this.db.update(savedQueries).set({
         name: input.name,
@@ -148,6 +154,7 @@ export class SavedQueriesService {
           provider: draft.provider, model: draft.model, tables: draft.tables,
           columnTypes: draft.columnTypes, outputOrder: input.outputOrder ?? [], lastRunAt: null,
           filters: withFilterDefaults(draft.filters ?? [], input.filterValues),
+          plan: { ...draft.plan!, filters: withFilterDefaults(draft.filters ?? [], input.filterValues).map(({ id, table, column, operator, defaultValue }) => ({ id, table, column, operator, defaultValue })) },
         } : {}),
       }).where(and(eq(savedQueries.id, input.id), eq(savedQueries.userId, userId))).returning()
       if (!row) throw new SavedQueryNotFoundError()
