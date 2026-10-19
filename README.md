@@ -1,6 +1,6 @@
 # AI Advance Search
 
-![AI Advance Search: plain-English questions, connected database entities, and reusable queries](apps/web/public/project-cover.png)
+![AI Advance Search: plain-English questions, connected database entities, and reusable queries](apps/web/public/linkedin-architecture.png)
 
 A contract-first TypeScript monorepo for searching documents and turning plain-English questions into reviewable, read-only PostgreSQL queries.
 

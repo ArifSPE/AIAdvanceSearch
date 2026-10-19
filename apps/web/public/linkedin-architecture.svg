@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600" viewBox="0 0 1600 1600" role="img" aria-labelledby="title description">
+  <title id="title">AI Advance Search: The LLM proposes. The backend decides.</title>
+  <desc id="description">Architecture diagram separating the user interface, LLM, metadata database, application backend, and application database. The backend validates SQL proposals and binds filter values before restricted read-only execution. Normal application CRUD uses a separate application role.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M 0 0 L 9 5 L 0 10 Z" fill="#34755d"/></marker>
+    <marker id="amberArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M 0 0 L 9 5 L 0 10 Z" fill="#ae7626"/></marker>
+    <marker id="greyArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M 0 0 L 9 5 L 0 10 Z" fill="#778681"/></marker>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#d6dfd9"/></pattern>
+  </defs>
+  <rect width="1600" height="1600" fill="#f5f8f5"/>
+  <rect x="48" y="346" width="1504" height="992" fill="url(#grid)"/>
+  <g font-family="Avenir Next, Helvetica Neue, sans-serif">
+    <rect x="72" y="62" width="38" height="38" rx="8" fill="#1d5d46"/>
+    <path d="M 82 73 L 89 81 L 82 89 M 94 89 L 101 89" stroke="#e5f5eb" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="128" y="89" font-size="21" font-weight="600" fill="#315244">AI ADVANCE SEARCH</text>
+    <text x="1528" y="88" text-anchor="end" font-size="18" fill="#61756a">PROOF OF CONCEPT / ARCHITECTURE</text>
+    <text x="72" y="174" font-size="64" font-weight="700" fill="#172d25">The LLM proposes.</text>
+    <text x="72" y="248" font-size="64" font-weight="700" fill="#287052">The backend decides.</text>
+    <text x="75" y="295" font-size="25" fill="#536c5e">Natural-language queries with explicit execution boundaries.</text>
+
+    <rect x="520" y="347" width="560" height="104" rx="8" fill="#ffffff" stroke="#b9cabe" stroke-width="2"/>
+    <text x="800" y="390" text-anchor="middle" font-size="28" font-weight="600" fill="#172d25">User interface</text>
+    <text x="800" y="425" text-anchor="middle" font-size="21" fill="#536c5e">Question, selection, filters, SQL review</text>
+    <path d="M 800 451 L 800 510" fill="none" stroke="#34755d" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <rect x="485" y="491" width="630" height="586" rx="8" fill="#e9f2ec" stroke="#8eaf9b" stroke-width="2" stroke-dasharray="8 7"/>
+    <text x="800" y="541" text-anchor="middle" font-size="17" font-weight="600" fill="#356449">APPLICATION-CONTROLLED EXECUTION</text>
+    <rect x="520" y="564" width="560" height="474" rx="8" fill="#173e30"/>
+    <text x="552" y="610" font-size="30" font-weight="600" fill="#f2f8f3">Application backend</text>
+    <text x="552" y="646" font-size="21" fill="#b8d7c4">Fastify / oRPC / Drizzle</text>
+    <line x1="552" y1="671" x2="1048" y2="671" stroke="#52735e"/>
+
+    <text x="552" y="711" font-size="17" font-weight="600" fill="#a6daba">01</text>
+    <text x="600" y="711" font-size="24" font-weight="600" fill="#ffffff">Authenticate and authorize</text>
+    <text x="600" y="746" font-size="20" fill="#c0d6c8">User identity and ownership checks</text>
+    <text x="552" y="799" font-size="17" font-weight="600" fill="#a6daba">02</text>
+    <text x="600" y="799" font-size="24" font-weight="600" fill="#ffffff">Validate the SQL proposal</text>
+    <text x="600" y="834" font-size="20" fill="#c0d6c8">AST, table/column and function rules</text>
+    <text x="552" y="887" font-size="17" font-weight="600" fill="#a6daba">03</text>
+    <text x="600" y="887" font-size="24" font-weight="600" fill="#ffffff">Bind values and execute</text>
+    <text x="600" y="922" font-size="20" fill="#c0d6c8">Typed filters become SQL parameters</text>
+    <line x1="552" y1="948" x2="1048" y2="948" stroke="#52735e"/>
+    <text x="800" y="990" text-anchor="middle" font-size="22" fill="#c7e7d2">Read-only transaction / 5s timeout / 200 rows</text>
+
+    <rect x="72" y="609" width="352" height="265" rx="8" fill="#fff9ee" stroke="#d1b78e" stroke-width="2"/>
+    <text x="98" y="657" font-size="31" font-weight="600" fill="#62451e">LLM</text>
+    <text x="98" y="698" font-size="22" fill="#735b39">Recommend a selection</text>
+    <text x="98" y="734" font-size="22" fill="#735b39">Propose a SQL draft</text>
+    <line x1="98" y1="759" x2="398" y2="759" stroke="#ddc9a9"/>
+    <text x="98" y="797" font-size="20" font-weight="600" fill="#62451e">No direct DB connection</text>
+    <text x="98" y="835" font-size="18" fill="#735b39">Ollama or supported cloud model</text>
+
+    <path d="M 520 629 L 466 629 L 466 555 L 248 555 L 248 605" fill="none" stroke="#34755d" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="250" y="534" text-anchor="middle" font-size="21" fill="#356449">Question + schema metadata</text>
+    <path d="M 248 874 L 248 946 L 516 946" fill="none" stroke="#ae7626" stroke-width="2.5" marker-end="url(#amberArrow)"/>
+    <text x="252" y="986" text-anchor="middle" font-size="22" font-weight="600" fill="#8b5c1b">Untrusted SQL proposal</text>
+
+    <rect x="1176" y="609" width="352" height="265" rx="8" fill="#ffffff" stroke="#b9cabe" stroke-width="2"/>
+    <text x="1202" y="657" font-size="29" font-weight="600" fill="#172d25">Metadata layer</text>
+    <text x="1202" y="698" font-size="22" fill="#536c5e">Active tables and columns</text>
+    <text x="1202" y="734" font-size="22" fill="#536c5e">Types and descriptions</text>
+    <text x="1202" y="770" font-size="22" fill="#536c5e">Relationships and enums</text>
+    <line x1="1202" y1="792" x2="1502" y2="792" stroke="#d4dfd7"/>
+    <text x="1202" y="835" font-size="18" fill="#536c5e">Separate metadata PostgreSQL</text>
+    <path d="M 1080 629 L 1135 629 L 1135 555 L 1352 555 L 1352 605" fill="none" stroke="#34755d" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="1352" y="534" text-anchor="middle" font-size="21" fill="#356449">Active catalog lookup</text>
+    <path d="M 1176 793 L 1118 793 L 1118 815 L 1084 815" fill="none" stroke="#34755d" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <path d="M 740 1038 L 740 1179" fill="none" stroke="#34755d" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="714" y="1127" text-anchor="end" font-size="20" font-weight="600" fill="#356449">Bound SQL</text>
+    <path d="M 860 1183 L 860 1044" fill="none" stroke="#34755d" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="889" y="1127" font-size="20" fill="#356449">Query results</text>
+
+    <rect x="410" y="1184" width="780" height="151" rx="8" fill="#ffffff" stroke="#8eaf9b" stroke-width="2"/>
+    <text x="800" y="1230" text-anchor="middle" font-size="29" font-weight="600" fill="#172d25">Application PostgreSQL</text>
+    <text x="800" y="1270" text-anchor="middle" font-size="22" fill="#356449">Restricted query role: SELECT on permitted tables</text>
+    <text x="800" y="1308" text-anchor="middle" font-size="19" fill="#536c5e">Business data / users / saved queries / settings</text>
+    <path d="M 1080 982 L 1300 982 L 1300 1258 L 1194 1258" fill="none" stroke="#778681" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#greyArrow)"/>
+    <text x="1321" y="1098" font-size="20" fill="#61756a">Separate app role</text>
+    <text x="1321" y="1131" font-size="18" fill="#61756a">Normal app CRUD</text>
+
+    <line x1="72" y1="1393" x2="1528" y2="1393" stroke="#c3d1c7"/>
+    <text x="75" y="1441" font-size="27" font-weight="600" fill="#172d25">The model recommends. It does not execute.</text>
+    <text x="75" y="1482" font-size="22" fill="#536c5e">The backend controls catalog access, validation, parameters, and execution.</text>
+    <text x="75" y="1531" font-size="18" fill="#61756a">Restricted execution requires QUERY_DB_URL. Development fallback uses the app role.</text>
+    <text x="75" y="1561" font-size="18" fill="#61756a">Defense in depth, not a complete SQL sandbox. Schema metadata and questions are shared with the selected LLM.</text>
+  </g>
+</svg>
