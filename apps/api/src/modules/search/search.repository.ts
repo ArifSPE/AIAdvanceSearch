@@ -20,16 +20,20 @@ export class SearchRepository {
     rows: SearchRow[]
     total: number
   }> {
+    // websearch_to_tsquery supports familiar search syntax such as quoted phrases and OR.
     const tsQuery = sql`websearch_to_tsquery('english', ${q})`
+    // Search both fields so a title match and a body match use the same ranking pipeline.
     const tsVector = sql`to_tsvector('english', ${documents.title} || ' ' || ${documents.content})`
     const matches = sql`${tsVector} @@ ${tsQuery}`
 
+    // Fetch the requested page and the unpaginated match count concurrently.
     const [rows, totals] = await Promise.all([
       this.db
         .select({
           id: documents.id,
           title: documents.title,
           url: documents.url,
+          // Return a short highlighted fragment for each matching document.
           snippet: sql<string>`ts_headline(
             'english',
             ${documents.content},

@@ -9,7 +9,7 @@ export function SiteHeader() {
   return (
     <nav className="mx-auto flex max-w-3xl flex-wrap items-center gap-3 px-4 py-4 text-sm sm:gap-6 sm:px-6">
       <Link href="/" className="font-semibold">AI Advance Search</Link>
-      <Link href="/search" className="text-ink-muted hover:text-ink">PG Vector Search</Link>
+      <Link href="/search" className="text-ink-muted hover:text-ink">PostgreSQL Full-Text Search</Link>
       <Link href="/advanced-search" className="text-ink-muted hover:text-ink">Advanced DB Search</Link>
       {status === 'authenticated' && user?.role === 'IT-Admin' && <Link href="/admin" className="text-ink-muted hover:text-ink">Admin</Link>}
       <div className="ml-auto flex items-center gap-4">
