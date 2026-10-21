@@ -8,7 +8,7 @@ import {
   selectionRecommendationInputSchema,
   selectionRecommendationSchema,
 } from '../schemas/llm'
-import { unauthorizedError } from './errors'
+import { llmFailureErrors, unauthorizedError } from './errors'
 
 export const llmContract = {
   recommendSelection: oc
@@ -21,12 +21,12 @@ export const llmContract = {
     })
     .errors({
       ...unauthorizedError,
+      ...llmFailureErrors,
       LLM_PROVIDER_NOT_CONFIGURED: { message: 'The selected LLM provider is not configured on the server', status: 400 },
       LLM_MODEL_NOT_ALLOWED: { message: 'The selected model is not allowed for this provider', status: 400 },
       NO_MATCHING_SCHEMA: { message: 'No tables or columns matched this question. Try rephrasing it.', status: 422 },
       CLARIFICATION_REQUIRED: { message: 'Please clarify the question before continuing', status: 422 },
       UNSUPPORTED_QUERY: { message: 'This question cannot be represented safely by the supported query plan', status: 422 },
-      LLM_UNAVAILABLE: { message: 'The configured LLM provider could not suggest a selection', status: 502 },
     })
     .input(selectionRecommendationInputSchema)
     .output(selectionRecommendationSchema),
@@ -52,12 +52,12 @@ export const llmContract = {
     })
     .errors({
       ...unauthorizedError,
+      ...llmFailureErrors,
       INVALID_SCHEMA_SELECTION: { message: 'The selected tables or columns are not available', status: 400 },
       CLARIFICATION_REQUIRED: { message: 'Please clarify the question before continuing', status: 422 },
       UNSUPPORTED_QUERY: { message: 'This question cannot be represented safely by the supported query plan', status: 422 },
       LLM_PROVIDER_NOT_CONFIGURED: { message: 'The selected LLM provider is not configured on the server', status: 400 },
       LLM_MODEL_NOT_ALLOWED: { message: 'The selected model is not allowed for this provider', status: 400 },
-      LLM_UNAVAILABLE: { message: 'The configured LLM provider could not generate a query', status: 502 },
     })
     .input(queryGenerationInputSchema)
     .output(generatedQuerySchema),

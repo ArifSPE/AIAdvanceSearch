@@ -1,11 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { queryPlanSchema } from '@ais/shared'
-import { approvedRelationships, compileQueryPlan } from './query-plan'
+import { approvedRelationships, compileQueryPlan, materializeReviewedPlan, reviewedPlanningSchema } from './query-plan'
 import { testCatalog } from '../../../tests/helpers/query-catalog'
 
 export const basePlan = queryPlanSchema.parse({ version: 1, tables: ['loans'], projections: [{ column: 'loans.loan_number', aggregate: 'none' }], joins: [], filters: [], groupBy: [], orderBy: [] })
 
 describe('constrained query-plan compiler', () => {
+  it('materializes reviewed output and filters without asking the model to copy them', () => {
+    const proposal = { version: 1, tables: ['loans'], projectionAggregates: ['none'], joins: [], groupBy: [], orderBy: [] }
+    const reviewed = [{ id: 'user_filter_42', table: 'loans', column: 'outstanding_balance', operator: 'gte' as const, defaultValue: '500000' }]
+    const plan = materializeReviewedPlan(proposal, ['loans.id'], reviewed)
+    expect(plan.projections).toEqual([{ column: 'loans.id', aggregate: 'none' }])
+    expect(plan.filters).toEqual(reviewed)
+    expect(() => compileQueryPlan(plan, testCatalog, { selectedColumns: ['loans.id'], filters: reviewed })).not.toThrow()
+  })
+  it('keeps reviewed no-filter decisions and rejects model-supplied projection/filter overrides', () => {
+    const proposal = { version: 1, tables: ['loans'], projectionAggregates: ['none'], joins: [], groupBy: [], orderBy: [] }
+    expect(materializeReviewedPlan(proposal, ['loans.id'], []).filters).toEqual([])
+    const schema = reviewedPlanningSchema(['loans.id'], []).shape.plan
+    expect(schema.safeParse({ ...proposal, filters: [{ id: 'made_up' }] }).success).toBe(false)
+    expect(schema.safeParse({ ...proposal, projections: [{ column: 'loans.loan_number', aggregate: 'none' }] }).success).toBe(false)
+    expect(schema.safeParse({ ...proposal, projectionAggregates: [] }).success).toBe(false)
+  })
+  it('allows model-proposed filters only when no reviewed list was supplied', () => {
+    const proposal = { version: 1, tables: ['loans'], projectionAggregates: ['none'], joins: [], groupBy: [], orderBy: [], filters: [{ id: 'balance', table: 'loans', column: 'outstanding_balance', operator: 'gte', defaultValue: '500000' }] }
+    expect(materializeReviewedPlan(proposal, ['loans.loan_number']).filters).toEqual(proposal.filters)
+  })
   it('compiles reviewed projections, bound filters, and ordinal sorting', () => {
     const plan = { ...basePlan, filters: [{ id: 'balance', table: 'loans', column: 'outstanding_balance', operator: 'gte', defaultValue: '500000' }], orderBy: [{ projection: 0, direction: 'asc' }] }
     const result = compileQueryPlan(plan, testCatalog, { selectedColumns: ['loans.loan_number'] })

@@ -1,4 +1,5 @@
-import { defineQueryFilter, filterInputType, queryPlanSchema, type MetadataTableWithColumns, type QueryFilterInput, type QueryPlan } from '@ais/shared'
+import { defineQueryFilter, filterInputType, queryPlanSchema, queryPlanningOutputSchema, type MetadataTableWithColumns, type QueryFilterInput, type QueryPlan } from '@ais/shared'
+import { z } from 'zod'
 import { addQueryFilters } from './query-filters'
 
 export interface ApprovedRelationship {
@@ -21,6 +22,25 @@ export function approvedRelationships(catalog: MetadataTableWithColumns[]): Appr
 
 function quote(name: string): string { return `"${name.replaceAll('"', '""')}"` }
 function reference(name: string): string { return name.split('.').map(quote).join('.') }
+
+export function reviewedPlanningSchema(outputColumns: string[], reviewedFilters?: QueryFilterInput[]) {
+  const aggregate = queryPlanSchema.shape.projections.element.shape.aggregate
+  const plan = queryPlanSchema.omit({ projections: true, filters: true }).extend({
+    projectionAggregates: z.array(aggregate).length(outputColumns.length),
+    ...(reviewedFilters === undefined ? { filters: queryPlanSchema.shape.filters } : {}),
+  }).strict()
+  return queryPlanningOutputSchema.omit({ plan: true }).extend({ plan: plan.nullable() }).strict()
+}
+
+export function materializeReviewedPlan(proposal: unknown, outputColumns: string[], reviewedFilters?: QueryFilterInput[]): QueryPlan {
+  const schema = reviewedPlanningSchema(outputColumns, reviewedFilters)
+  const parsed = schema.shape.plan.unwrap().parse(proposal)
+  const { projectionAggregates, ...structuralPlan } = parsed
+  return queryPlanSchema.parse({ ...structuralPlan,
+    projections: outputColumns.map((column, index) => ({ column, aggregate: projectionAggregates[index] })),
+    filters: reviewedFilters ?? ('filters' in parsed ? parsed.filters : []),
+  })
+}
 
 export function compileQueryPlan(input: unknown, catalog: MetadataTableWithColumns[], options?: {
   selectedColumns?: string[]

@@ -11,6 +11,7 @@ import { NoMatchingSchemaError, SelectionRecommendationService } from '../module
 import { pub, requireAuth } from '../orpc/base'
 import { InvalidFilterValuesError } from '../modules/llm/query-filters'
 import { QueryPlanningDecisionError } from '../modules/llm/planning-decision'
+import { llmFailureCode } from '../modules/llm/llm-failure'
 
 export const llmRouter = {
   providers: pub.llm.providers.use(requireAuth).handler(({ context }) => listLlmProviders(context.db)),
@@ -27,7 +28,7 @@ export const llmRouter = {
       if (error instanceof LlmProviderNotConfiguredError) throw errors.LLM_PROVIDER_NOT_CONFIGURED()
       if (error instanceof LlmModelNotAllowedError) throw errors.LLM_MODEL_NOT_ALLOWED()
       context.logger.error({ err: error }, 'LLM selection recommendation failed')
-      throw errors.LLM_UNAVAILABLE()
+      throw errors[llmFailureCode(error)]()
     }
   }),
 
@@ -49,7 +50,7 @@ export const llmRouter = {
         throw errors.LLM_MODEL_NOT_ALLOWED()
       }
       context.logger.error({ err: error }, 'LLM query generation failed')
-      throw errors.LLM_UNAVAILABLE()
+      throw errors[llmFailureCode(error)]()
     }
   }),
 
